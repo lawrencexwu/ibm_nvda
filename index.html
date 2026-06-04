@@ -9,25 +9,25 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    /* Warm-neutral, restrained palette — accents used sparingly */
-    --bg-0:#090a0e;
-    --bg-1:#0d0f15;
-    --ink:#ECEAE3;            /* warm off-white, paper */
-    --ink-dim:#9a9ca6;        /* muted cool grey */
-    --ink-faint:#6c6f7a;
-    --hair:rgba(236,234,227,0.09);
-    --hair-soft:rgba(236,234,227,0.05);
-    --card:rgba(18,20,27,0.30);
+    /* Light editorial — warm ivory paper, charcoal ink, deep print accents */
+    --paper-0:#F4F1EA;
+    --paper-1:#EDE9DF;
+    --ink:#211F1B;            /* warm near-black */
+    --ink-dim:#6E6A62;        /* warm grey */
+    --ink-faint:#A7A296;
+    --hair:rgba(33,31,27,0.12);
+    --hair-soft:rgba(33,31,27,0.07);
+    --card:rgba(252,251,247,0.86);
 
-    --blue:#6fa3d0;           /* IBM — muted slate */
-    --green:#93cf5f;          /* NVIDIA — refined, less acid */
-    --amber:#d8b673;          /* centre — brass */
-    --terra:#cc6552;          /* risk — terracotta */
+    --blue:#3E6B99;           /* IBM — deep slate */
+    --green:#4F8A30;          /* NVIDIA — forest, legible on paper */
+    --ochre:#A8792B;          /* centre — ochre/brass */
+    --terra:#A8442E;          /* risk — rust */
 
-    --blue-rgb:111,163,208;
-    --green-rgb:147,207,95;
-    --amber-rgb:216,182,115;
-    --terra-rgb:204,101,82;
+    --blue-rgb:62,107,153;
+    --green-rgb:79,138,48;
+    --ochre-rgb:168,121,43;
+    --terra-rgb:168,68,46;
 
     --sans:"Inter","Noto Sans TC","PingFang TC","Microsoft JhengHei",
            system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
@@ -39,8 +39,8 @@
     width:100%; height:100%;
     overflow:hidden;                          /* no scrolling */
     background:
-      radial-gradient(1300px 900px at 50% -10%, rgba(255,255,255,0.035), transparent 55%),
-      linear-gradient(180deg, var(--bg-1), var(--bg-0) 70%);
+      radial-gradient(1200px 820px at 50% -8%, #FBF8F1, transparent 60%),
+      linear-gradient(180deg, var(--paper-0), var(--paper-1));
     color:var(--ink);
     font-family:var(--sans);
     font-feature-settings:"ss01","cv01","tnum";
@@ -48,33 +48,31 @@
     text-rendering:optimizeLegibility;
   }
 
-  /* 3D background canvas — quiet supporting layer */
   #scene{ position:fixed; inset:0; width:100%; height:100%; display:block; z-index:0; pointer-events:none; }
 
-  /* Soft vignette to seat the 3D */
+  /* barely-there warm edge vignette */
   #vignette{ position:fixed; inset:0; z-index:1; pointer-events:none;
-    background: radial-gradient(125% 100% at 50% 38%, transparent 58%, rgba(0,0,0,0.5) 100%); }
+    background: radial-gradient(130% 105% at 50% 40%, transparent 62%, rgba(150,135,105,0.10) 100%); }
 
-  /* Overlay grid */
   #ui{
     position:fixed; inset:0; z-index:2;
     display:grid;
     grid-template-rows: auto minmax(0,1fr) auto;
-    padding: clamp(14px,2.4vh,30px) clamp(20px,3vw,56px) clamp(10px,1.6vh,20px);
-    gap: clamp(10px,1.6vh,20px);
+    padding: clamp(10px,1.8vh,22px) clamp(20px,3vw,56px) clamp(8px,1.3vh,16px);
+    gap: clamp(8px,1.3vh,16px);
     pointer-events:none;
   }
   #ui section, #ui .card, #ui footer, #ui header{ pointer-events:auto; }
 
   /* ---------- Header ---------- */
-  header{ text-align:center; display:flex; flex-direction:column; gap:.55em; }
+  header{ text-align:center; display:flex; flex-direction:column; gap:.42em; }
   header h1{
     font-size: clamp(21px,2.5vw,40px);
     font-weight:600; letter-spacing:-0.015em; line-height:1.08; color:var(--ink);
   }
   header h1 .hl{ color:var(--green); }
   header p.sub{
-    font-size: clamp(11px,1.02vw,15.5px); line-height:1.5; font-weight:300;
+    font-size: clamp(11px,1.02vw,15.5px); line-height:1.5; font-weight:400;
     color:var(--ink-dim); letter-spacing:.005em; max-width:980px; margin:0 auto;
   }
 
@@ -82,102 +80,101 @@
   main{
     display:grid;
     grid-template-columns: 1fr 1.14fr 1fr;
-    gap: clamp(14px,2vw,34px);
-    align-items:start;                        /* cards hug top; 3D lives below */
+    gap: clamp(13px,1.9vw,32px);
+    align-items:start;
     min-height:0;
   }
   .col{ display:flex; flex-direction:column; min-height:0; }
   .ibm{ --accent:var(--blue); --accent-rgb:var(--blue-rgb); }
-  .center{ --accent:var(--amber); --accent-rgb:var(--amber-rgb); }
+  .center{ --accent:var(--ochre); --accent-rgb:var(--ochre-rgb); }
   .nv{ --accent:var(--green); --accent-rgb:var(--green-rgb); }
 
   .card{
     position:relative;
     background:var(--card);
     border:1px solid var(--hair);
-    border-radius:13px;
-    backdrop-filter: blur(16px) saturate(108%);
-    -webkit-backdrop-filter: blur(16px) saturate(108%);
-    padding: clamp(14px,1.9vh,22px) clamp(15px,1.25vw,24px) clamp(15px,2vh,22px);
-    box-shadow: 0 20px 60px rgba(0,0,0,0.42);
+    border-radius:12px;
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    padding: clamp(12px,1.6vh,18px) clamp(14px,1.15vw,22px) clamp(13px,1.7vh,19px);
+    box-shadow: 0 12px 34px rgba(60,50,30,0.08), 0 1px 0 rgba(255,255,255,0.6) inset;
   }
-  /* editorial left accent tick */
-  .card::before{ content:""; position:absolute; left:0; top:clamp(14px,1.9vh,22px);
-    width:3px; height:1.45em; border-radius:0 3px 3px 0; background:var(--accent); opacity:.9; }
+  .card::before{ content:""; position:absolute; left:0; top:clamp(12px,1.6vh,18px);
+    width:3px; height:1.4em; border-radius:0 3px 3px 0; background:var(--accent); opacity:.95; }
 
   .eyebrow{ font-size:clamp(9px,.74vw,10.5px); letter-spacing:.22em; text-transform:uppercase;
-    font-weight:600; color:var(--accent); margin-bottom:.7em; opacity:.92; }
+    font-weight:600; color:var(--accent); margin-bottom:.65em; }
   .card-title{ font-size: clamp(15px,1.42vw,22px); font-weight:600; letter-spacing:-0.01em;
     line-height:1.18; color:var(--ink); }
 
   /* IBM flow */
-  .flow{ list-style:none; display:flex; flex-direction:column; gap:.34em; margin-top:.9em; }
+  .flow{ list-style:none; display:flex; flex-direction:column; gap:.28em; margin-top:.85em; }
   .flow li{ font-size:clamp(10.5px,.97vw,14px); position:relative; padding-left:1.25em;
-    line-height:1.45; color:var(--ink); font-weight:400; }
-  .flow li::before{ content:""; position:absolute; left:.1em; top:.62em; width:.32em; height:.32em;
-    border-radius:50%; background:var(--accent); opacity:.55; }
+    line-height:1.4; color:var(--ink); font-weight:400; }
+  .flow li::before{ content:""; position:absolute; left:.1em; top:.6em; width:.32em; height:.32em;
+    border-radius:50%; background:var(--accent); opacity:.6; }
   .flow li.start::before{ opacity:1; }
   .flow li.result{ color:var(--terra); font-weight:500; }
   .flow li.result::before{ background:var(--terra); opacity:1; }
 
-  .lesson{ margin-top:1em; padding:.7em .85em; border-radius:9px;
+  .lesson{ margin-top:.9em; padding:.6em .8em; border-radius:9px;
     background:rgba(var(--blue-rgb),0.07); border-left:2px solid var(--blue);
-    font-size:clamp(11.5px,1.05vw,15px); font-weight:500; line-height:1.45; color:var(--ink); }
+    font-size:clamp(11.5px,1.05vw,15px); font-weight:500; line-height:1.42; color:var(--ink); }
 
   /* Centre — board questions */
-  .q{ margin-top:.95em; padding-top:.85em; border-top:1px solid var(--hair-soft); }
-  .q:first-of-type{ border-top:none; padding-top:.25em; }
-  .q .qhead{ display:flex; gap:.6em; align-items:baseline; }
+  .q{ margin-top:.8em; padding-top:.7em; border-top:1px solid var(--hair-soft); }
+  .q:first-of-type{ border-top:none; padding-top:.2em; }
+  .q .qhead{ display:flex; gap:.55em; align-items:baseline; }
   .q .qno{ flex:none; font-size:clamp(8.5px,.72vw,10.5px); font-weight:600; letter-spacing:.06em;
-    color:var(--amber); border:1px solid rgba(var(--amber-rgb),0.5); border-radius:4px;
-    padding:.12em .42em; line-height:1.2; }
-  .q .qtext{ font-size:clamp(11.5px,1.06vw,15.5px); font-weight:600; line-height:1.35; color:var(--ink); letter-spacing:-0.005em; }
-  .q .ans{ font-size:clamp(10px,.9vw,13px); line-height:1.55; color:var(--ink-dim); margin-top:.4em; font-weight:400; }
-  .q .ans b{ color:var(--amber); font-weight:600; }
+    color:var(--ochre); border:1px solid rgba(var(--ochre-rgb),0.55); border-radius:4px;
+    padding:.1em .42em; line-height:1.2; }
+  .q .qtext{ font-size:clamp(11.5px,1.06vw,15.5px); font-weight:600; line-height:1.32; color:var(--ink); letter-spacing:-0.005em; }
+  .q .ans{ font-size:clamp(10px,.9vw,13px); line-height:1.5; color:var(--ink-dim); margin-top:.35em; font-weight:400; }
+  .q .ans b{ color:var(--ochre); font-weight:600; }
 
-  .paths{ display:grid; grid-template-columns:1fr 1fr; gap:.55em; margin-top:.6em; }
-  .path{ font-size:clamp(9px,.8vw,12px); line-height:1.42; padding:.6em .7em; border-radius:8px;
-    background:rgba(236,234,227,0.022); color:var(--ink-dim); }
-  .path .tag{ display:block; font-weight:600; font-size:.95em; letter-spacing:.02em; margin-bottom:.35em; }
-  .path.a{ border:1px solid rgba(var(--green-rgb),0.32); }
+  .paths{ display:grid; grid-template-columns:1fr 1fr; gap:.5em; margin-top:.55em; }
+  .path{ font-size:clamp(9px,.8vw,12px); line-height:1.4; padding:.55em .65em; border-radius:8px;
+    background:rgba(33,31,27,0.025); color:var(--ink-dim); }
+  .path .tag{ display:block; font-weight:600; font-size:.95em; letter-spacing:.02em; margin-bottom:.32em; }
+  .path.a{ border:1px solid rgba(var(--green-rgb),0.4); }
   .path.a .tag{ color:var(--green); }
-  .path.b{ border:1px solid rgba(var(--terra-rgb),0.34); }
+  .path.b{ border:1px solid rgba(var(--terra-rgb),0.4); }
   .path.b .tag{ color:var(--terra); }
 
   /* NVIDIA — control stack */
-  .stack{ display:flex; flex-direction:column; gap:.42em; margin-top:.9em; }
-  .lyr{ display:flex; align-items:center; gap:.7em; padding:.5em .65em; border-radius:9px;
-    background:rgba(236,234,227,0.022); border:1px solid var(--hair); }
+  .stack{ display:flex; flex-direction:column; gap:.36em; margin-top:.85em; }
+  .lyr{ display:flex; align-items:center; gap:.7em; padding:.45em .6em; border-radius:9px;
+    background:rgba(33,31,27,0.022); border:1px solid var(--hair); }
   .lyr .n{ flex:none; width:1.7em; height:1.7em; display:grid; place-items:center; border-radius:50%;
     font-size:clamp(9px,.76vw,11.5px); font-weight:600; color:var(--green);
-    border:1px solid rgba(var(--green-rgb),0.55); }
+    border:1px solid rgba(var(--green-rgb),0.6); }
   .lyr .body{ min-width:0; display:flex; align-items:baseline; flex-wrap:wrap; gap:.1em .6em; }
   .lyr .nm{ font-size:clamp(10.5px,.96vw,13.5px); font-weight:600; color:var(--ink); letter-spacing:-0.005em; }
   .lyr .dt{ font-size:clamp(9px,.8vw,11.5px); color:var(--ink-dim); line-height:1.3; font-weight:400; }
-  .lyr.top{ border-color:rgba(var(--amber-rgb),0.42); background:rgba(var(--amber-rgb),0.05); }
-  .lyr.top .n{ color:var(--amber); border-color:rgba(var(--amber-rgb),0.6); }
+  .lyr.top{ border-color:rgba(var(--ochre-rgb),0.45); background:rgba(var(--ochre-rgb),0.06); }
+  .lyr.top .n{ color:var(--ochre); border-color:rgba(var(--ochre-rgb),0.65); }
 
-  .killbox{ margin-top:.9em; padding:.65em .8em; border-radius:9px;
-    background:rgba(var(--terra-rgb),0.07); border:1px solid rgba(var(--terra-rgb),0.38);
-    font-size:clamp(9.5px,.86vw,12.5px); line-height:1.5; color:var(--ink-dim); font-weight:400; }
+  .killbox{ margin-top:.85em; padding:.6em .78em; border-radius:9px;
+    background:rgba(var(--terra-rgb),0.07); border:1px solid rgba(var(--terra-rgb),0.4);
+    font-size:clamp(9.5px,.86vw,12.5px); line-height:1.48; color:var(--ink-dim); font-weight:400; }
   .killbox b{ color:var(--terra); font-weight:600; letter-spacing:.02em; }
 
   /* ---------- Footer ---------- */
-  footer{ display:flex; flex-direction:column; align-items:center; gap:.4em; text-align:center;
-    border-top:1px solid var(--hair); padding: clamp(10px,1.5vh,16px) clamp(16px,2vw,30px) clamp(6px,1vh,12px); }
+  footer{ display:flex; flex-direction:column; align-items:center; gap:.35em; text-align:center;
+    border-top:1px solid var(--hair); padding: clamp(9px,1.4vh,15px) clamp(16px,2vw,30px) clamp(5px,.9vh,11px); }
   footer .concl{ font-size: clamp(11px,1.08vw,16px); font-weight:400; line-height:1.45; color:var(--ink-dim); }
   footer .concl .risk{ color:var(--terra); font-weight:600; }
-  footer .final{ font-size: clamp(12px,1.18vw,18px); font-weight:600; letter-spacing:.01em; color:var(--amber); }
+  footer .final{ font-size: clamp(12px,1.18vw,18px); font-weight:600; letter-spacing:.01em; color:var(--ochre); }
 
   #fallback-note{ position:fixed; bottom:6px; left:50%; transform:translateX(-50%); z-index:5;
-    font-size:11px; color:var(--ink-dim); background:rgba(0,0,0,.5); padding:4px 10px;
+    font-size:11px; color:var(--ink-dim); background:rgba(255,255,255,.7); padding:4px 10px;
     border-radius:8px; border:1px solid var(--hair); display:none; }
 
   @media (max-height:720px){
-    .flow{ gap:.24em; } .flow li{ line-height:1.32; }
-    .q{ margin-top:.7em; padding-top:.62em; }
-    .q .ans{ line-height:1.4; } .stack{ gap:.3em; }
-    .lyr{ padding:.4em .6em; }
+    .flow{ gap:.2em; } .flow li{ line-height:1.3; }
+    .q{ margin-top:.6em; padding-top:.55em; }
+    .q .ans{ line-height:1.38; } .stack{ gap:.26em; }
+    .lyr{ padding:.36em .55em; }
   }
 </style>
 </head>
@@ -303,21 +300,19 @@
     renderer.setClearColor(0x000000, 0);
 
     var scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x090a0e, 0.018);
+    // Light fog: distant line-art fades softly into the paper for depth
+    scene.fog = new THREE.FogExp2(0xF1EDE4, 0.020);
 
     var camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
     camera.position.set(0, 0.2, 19);
 
-    scene.add(new THREE.AmbientLight(0x3a4150, 1.15));
-    var key = new THREE.PointLight(0xfff4e6, 0.5, 0); key.position.set(0, 8, 14); scene.add(key);
+    // Deep print accents (legible line-art on ivory)
+    var BLUE = 0x3E6B99, GREEN = 0x4F8A30, OCHRE = 0xA8792B, TERRA = 0xA8442E, INK = 0x2b2824;
 
-    // Muted, refined palette (matches the CSS tokens)
-    var IBM = 0x6fa3d0, NV = 0x93cf5f, GOLD = 0xd8b673, RED = 0xcc6552;
-
-    // ---- Text sprite (canvas texture) — crisp, low glow ----
-    function label(text, glowHex, scale, fillCss) {
+    // ---- Text sprite — charcoal/accent ink, faint paper halo for legibility ----
+    function label(text, fillCss, scale) {
       scale = scale || 1;
-      var pad = 26, fs = 58;
+      var pad = 28, fs = 56;
       var cnv = document.createElement("canvas");
       var ctx = cnv.getContext("2d");
       ctx.font = "600 " + fs + "px Inter, Helvetica, Arial, sans-serif";
@@ -327,120 +322,123 @@
       ctx = cnv.getContext("2d");
       ctx.font = "600 " + fs + "px Inter, Helvetica, Arial, sans-serif";
       ctx.textBaseline = "middle"; ctx.textAlign = "center";
-      var glow = "#" + ("000000" + glowHex.toString(16)).slice(-6);
-      ctx.shadowColor = glow; ctx.shadowBlur = 14;
-      ctx.fillStyle = fillCss || "#efece4";
+      ctx.shadowColor = "rgba(244,241,234,0.95)"; ctx.shadowBlur = 8;   // paper halo
+      ctx.fillStyle = fillCss || "#2b2824";
       ctx.fillText(text, cnv.width / 2, cnv.height / 2);
       var tex = new THREE.CanvasTexture(cnv); tex.anisotropy = 4;
-      var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.92, depthTest: false }));
-      sp.scale.set((cnv.width / cnv.height) * 1.05 * scale, 1.05 * scale, 1);
+      var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.96, depthTest: false }));
+      sp.scale.set((cnv.width / cnv.height) * 1.02 * scale, 1.02 * scale, 1);
       sp.renderOrder = 10;
       return sp;
     }
+    function css(hex){ return "#" + ("000000" + hex.toString(16)).slice(-6); }
 
-    function glowSphere(r, hex, opacity) {
+    // ---- Line-art node: thin ring + faint disc ----
+    function node(r, hex, fillOp) {
       var g = new THREE.Group();
-      var core = new THREE.Mesh(new THREE.SphereGeometry(r, 32, 24),
-        new THREE.MeshStandardMaterial({ color: hex, emissive: hex, emissiveIntensity: 0.55, roughness: 0.5, metalness: 0.1 }));
-      g.add(core);
-      var halo = new THREE.Mesh(new THREE.SphereGeometry(r * 1.55, 24, 18),
-        new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: opacity == null ? 0.08 : opacity, side: THREE.BackSide }));
-      g.add(halo);
-      g.userData.core = core;
+      var ring = new THREE.Mesh(new THREE.TorusGeometry(r, Math.max(0.018, r * 0.05), 10, 56),
+        new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.8 }));
+      g.add(ring);
+      var disc = new THREE.Mesh(new THREE.CircleGeometry(r * 0.95, 44),
+        new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: fillOp == null ? 0.07 : fillOp }));
+      g.add(disc);
+      g.userData.ring = ring; g.userData.disc = disc;
+      return g;
+    }
+    // ---- Line-art rectangle: outline + faint fill ----
+    function rect(w, h, hex, fillOp) {
+      var g = new THREE.Group();
+      var edges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(w, h)),
+        new THREE.LineBasicMaterial({ color: hex, transparent: true, opacity: 0.72 }));
+      g.add(edges);
+      var fill = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+        new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: fillOp == null ? 0.05 : fillOp }));
+      g.add(fill);
+      g.userData.edges = edges; g.userData.fill = fill;
       return g;
     }
     function lineBetween(a, b, hex, op) {
       return new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]),
-        new THREE.LineBasicMaterial({ color: hex, transparent: true, opacity: op == null ? 0.32 : op }));
+        new THREE.LineBasicMaterial({ color: hex, transparent: true, opacity: op == null ? 0.5 : op }));
     }
 
-    // Clusters sit in a low band so the cards never cover them.
-    var Y = -5.0;
+    var Y = -5.2; // band base — clusters sit clearly below the cards
 
     /* ===================== LEFT — IBM loses control ===================== */
     var ibmGroup = new THREE.Group(); ibmGroup.position.set(-8.4, Y, 0); scene.add(ibmGroup);
 
-    var ibmMat = new THREE.MeshStandardMaterial({ color: IBM, emissive: IBM, emissiveIntensity: 0.5, roughness: 0.45, metalness: 0.15 });
-    var ibmCube = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.0, 2.0), ibmMat); ibmGroup.add(ibmCube);
-    var ibmEdges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(2.0, 2.0, 2.0)),
-      new THREE.LineBasicMaterial({ color: IBM, transparent: true, opacity: 0.55 })); ibmGroup.add(ibmEdges);
-    var ibmHalo = new THREE.Mesh(new THREE.BoxGeometry(2.7, 2.7, 2.7),
-      new THREE.MeshBasicMaterial({ color: IBM, transparent: true, opacity: 0.06, side: THREE.BackSide })); ibmGroup.add(ibmHalo);
-    ibmGroup.add((function(){ var l = label("IBM PC", IBM, 0.95); l.position.set(0, 1.85, 0); return l; })());
+    var cubeGrp = new THREE.Group(); ibmGroup.add(cubeGrp);
+    var cubeFill = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.0, 2.0),
+      new THREE.MeshBasicMaterial({ color: BLUE, transparent: true, opacity: 0.05 })); cubeGrp.add(cubeFill);
+    var cubeEdges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(2.0, 2.0, 2.0)),
+      new THREE.LineBasicMaterial({ color: BLUE, transparent: true, opacity: 0.7 })); cubeGrp.add(cubeEdges);
+    ibmGroup.add((function(){ var l = label("IBM PC", css(BLUE), 0.95); l.position.set(0, 1.8, 0); return l; })());
 
     var satNames = ["Intel", "Microsoft", "Clone Makers"];
     var satellites = [];
     satNames.forEach(function (n, i) {
-      var s = glowSphere(0.46, IBM, 0.08);
+      var s = node(0.42, BLUE, 0.06);
       var ang = (i / 3) * Math.PI * 2;
-      var dir = new THREE.Vector3(Math.cos(ang) * 1.0, Math.sin(ang) * 0.55 + 0.12, Math.sin(ang) * 0.5).normalize();
+      var dir = new THREE.Vector3(Math.cos(ang) * 1.0, Math.sin(ang) * 0.55 + 0.1, Math.sin(ang) * 0.5).normalize();
       s.position.copy(dir).multiplyScalar(2.3);
-      var lb = label(n, IBM, 0.58); lb.position.set(0, 0.85, 0); s.add(lb);
+      var lb = label(n, css(BLUE), 0.56); lb.position.set(0, 0.8, 0); s.add(lb);
       ibmGroup.add(s);
       satellites.push({ mesh: s, dir: dir, phase: i * 1.7 });
     });
 
-    var leakMat = new THREE.LineBasicMaterial({ color: RED, transparent: true, opacity: 0.6 });
-    var leakLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(
-      [new THREE.Vector3(0.7,-0.6,0), new THREE.Vector3(4.2,-2.4,0)]), leakMat);
-    ibmGroup.add(leakLine);
-    ibmGroup.add((function(){ var l = label("Value Leakage", RED, 0.55, "#e7b3a8"); l.position.set(4.4,-2.8,0); return l; })());
+    var leakMat = new THREE.LineBasicMaterial({ color: TERRA, transparent: true, opacity: 0.5 });
+    ibmGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(
+      [new THREE.Vector3(0.7,-0.6,0), new THREE.Vector3(4.2,-2.4,0)]), leakMat));
+    ibmGroup.add((function(){ var l = label("Value Leakage", css(TERRA), 0.54); l.position.set(4.4,-2.8,0); return l; })());
 
     /* ===================== CENTER — branching decision node ===================== */
-    var CTR_Y = Y - 0.6;
+    var CTR_Y = Y - 0.8;
     var ctrGroup = new THREE.Group(); ctrGroup.position.set(0, CTR_Y, 0); scene.add(ctrGroup);
 
-    var decideNode = glowSphere(0.78, GOLD, 0.1); decideNode.position.set(-1.4, 0, 0); ctrGroup.add(decideNode);
-    var decideRing = new THREE.Mesh(new THREE.TorusGeometry(1.05, 0.025, 12, 64),
-      new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0.4 }));
+    var decideNode = node(0.7, OCHRE, 0.08); decideNode.position.set(-1.4, 0, 0); ctrGroup.add(decideNode);
+    var decideRing = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.016, 10, 64),
+      new THREE.MeshBasicMaterial({ color: OCHRE, transparent: true, opacity: 0.45 }));
     decideRing.position.set(-1.4, 0, 0); ctrGroup.add(decideRing);
-    ctrGroup.add((function(){ var l = label("端側 Runtime?", GOLD, 0.6); l.position.set(-1.4, 1.25, 0); return l; })());
+    ctrGroup.add((function(){ var l = label("端側 Runtime?", css(OCHRE), 0.58); l.position.set(-1.4, 1.1, 0); return l; })());
 
-    var aPos = new THREE.Vector3(2.3, 1.2, 0);
-    var bPos = new THREE.Vector3(2.3, -1.35, 0);
+    var aPos = new THREE.Vector3(2.3, 1.0, 0);
+    var bPos = new THREE.Vector3(2.3, -1.1, 0);
     var nodeStart = new THREE.Vector3(-1.4, 0, 0);
-    var lineA = lineBetween(nodeStart, aPos, NV, 0.45); ctrGroup.add(lineA);
-    var lineB = lineBetween(nodeStart, bPos, RED, 0.3); ctrGroup.add(lineB);
+    var lineA = lineBetween(nodeStart, aPos, GREEN, 0.55); ctrGroup.add(lineA);
+    var lineB = lineBetween(nodeStart, bPos, TERRA, 0.4); ctrGroup.add(lineB);
 
-    var nodeA = glowSphere(0.56, NV, 0.12); nodeA.position.copy(aPos); ctrGroup.add(nodeA);
-    var labA = label("CUDA Extension", NV, 0.58, "#c9eaa6"); labA.position.set(2.5, 2.0, 0); ctrGroup.add(labA);
-    var nodeB = glowSphere(0.5, RED, 0.1); nodeB.position.copy(bPos); ctrGroup.add(nodeB);
-    var labB = label("Android Hardware", RED, 0.54, "#e7b3a8"); labB.position.set(2.5, -2.1, 0); ctrGroup.add(labB);
+    var nodeA = node(0.5, GREEN, 0.09); nodeA.position.copy(aPos); ctrGroup.add(nodeA);
+    var labA = label("CUDA Extension", css(GREEN), 0.56); labA.position.set(2.5, 1.7, 0); ctrGroup.add(labA);
+    var nodeB = node(0.46, TERRA, 0.07); nodeB.position.copy(bPos); ctrGroup.add(nodeB);
+    var labB = label("Android Hardware", css(TERRA), 0.52); labB.position.set(2.5, -1.75, 0); ctrGroup.add(labB);
 
     /* ===================== RIGHT — five stacked control layers ===================== */
-    var nvGroup = new THREE.Group(); nvGroup.position.set(8.4, Y + 0.3, 0); scene.add(nvGroup);
+    var nvGroup = new THREE.Group(); nvGroup.position.set(8.4, Y - 0.2, 0); scene.add(nvGroup);
 
     var layerNames = ["Compute", "Runtime", "Agent Layer", "Distribution", "Escalation"];
     var layers = [];
-    var gap = 0.78, baseY = -1.45;
+    var gap = 0.68, baseY = -1.25;
     for (var i = 0; i < 5; i++) {
       var top = (i === 4);
-      var col = top ? GOLD : NV;
-      var plate = new THREE.Mesh(
-        new THREE.BoxGeometry(3.0 - i * 0.08, 0.32, 0.6),
-        new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.28, roughness: 0.55, metalness: 0.12, transparent: true, opacity: 0.82 }));
-      plate.position.set(0, baseY + i * gap, 0);
-      nvGroup.add(plate);
-      var edge = new THREE.LineSegments(new THREE.EdgesGeometry(plate.geometry),
-        new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.45 }));
-      edge.position.copy(plate.position); nvGroup.add(edge);
-      var lb = label(layerNames[i], col, 0.48, top ? "#ecd6a3" : "#c9eaa6");
-      lb.position.set(0, baseY + i * gap, 0.6);
+      var col = top ? OCHRE : GREEN;
+      var r = rect(3.0 - i * 0.08, 0.5, col, 0.05);
+      r.position.set(0, baseY + i * gap, 0);
+      nvGroup.add(r);
+      var lb = label(layerNames[i], css(col), 0.46);
+      lb.position.set(0, baseY + i * gap, 0.05);
       nvGroup.add(lb);
-      layers.push({ plate: plate, base: 0.28 });
+      layers.push({ r: r });
     }
 
-    // Bright green escalation path: AI PC -> Workstation -> DGX / Cloud
-    var pathPts = [new THREE.Vector3(-2.6, -2.15, 0), new THREE.Vector3(0, -2.4, 0), new THREE.Vector3(2.6, -2.65, 0)];
+    // Escalation path: AI PC -> Workstation -> DGX / Cloud
+    var pathPts = [new THREE.Vector3(-2.6, -1.9, 0), new THREE.Vector3(0, -2.12, 0), new THREE.Vector3(2.6, -2.34, 0)];
     nvGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pathPts),
-      new THREE.LineBasicMaterial({ color: NV, transparent: true, opacity: 0.5 })));
+      new THREE.LineBasicMaterial({ color: GREEN, transparent: true, opacity: 0.5 })));
     var pathDots = [];
     pathPts.forEach(function (p) {
-      var d = new THREE.Mesh(new THREE.SphereGeometry(0.15, 14, 12),
-        new THREE.MeshStandardMaterial({ color: NV, emissive: NV, emissiveIntensity: 0.7 }));
-      d.position.copy(p); nvGroup.add(d); pathDots.push(d);
+      var d = node(0.14, GREEN, 0.18); d.position.copy(p); nvGroup.add(d); pathDots.push(d);
     });
-    nvGroup.add((function(){ var l = label("AI PC → Workstation → DGX / Cloud", NV, 0.52, "#c9eaa6"); l.position.set(0, -3.1, 0); return l; })());
+    nvGroup.add((function(){ var l = label("AI PC → Workstation → DGX / Cloud", css(GREEN), 0.5); l.position.set(0, -2.85, 0); return l; })());
 
     /* ===================== Resize ===================== */
     function resize() {
@@ -452,48 +450,46 @@
     }
     window.addEventListener("resize", resize); resize();
 
-    /* ===================== Animate — slow, quiet, executive-grade ===================== */
+    /* ===================== Animate — slow, quiet, line-art ===================== */
     var t0 = performance.now();
     function animate() {
       requestAnimationFrame(animate);
       var t = (performance.now() - t0) / 1000;
 
-      // IBM cube weakening + satellites drifting away
-      var decay = 0.55 + 0.35 * Math.abs(Math.sin(t * 0.12));
-      ibmMat.emissiveIntensity = (0.25 + 0.2 * (0.5 + 0.5 * Math.sin(t * 0.4))) * decay;
-      ibmEdges.material.opacity = 0.35 + 0.25 * decay;
-      ibmGroup.rotation.y = Math.sin(t * 0.09) * 0.14;
+      // IBM cube slowly rotating (wireframe), edges fading as control weakens
+      cubeGrp.rotation.y = t * 0.12;
+      cubeGrp.rotation.x = Math.sin(t * 0.18) * 0.12;
+      cubeEdges.material.opacity = 0.45 + 0.25 * (0.5 + 0.5 * Math.sin(t * 0.5));
       satellites.forEach(function (s) {
-        var d = 2.3 * (1 + (0.5 + 0.5 * Math.sin(t * 0.12 + s.phase)) * 0.4);
+        var d = 2.3 * (1 + (0.5 + 0.5 * Math.sin(t * 0.12 + s.phase)) * 0.38);
         s.mesh.position.copy(s.dir).multiplyScalar(d);
+        s.mesh.userData.ring.material.opacity = 0.55 + 0.25 * Math.sin(t * 0.6 + s.phase);
       });
-      leakMat.opacity = 0.25 + 0.3 * (0.5 + 0.5 * Math.sin(t * 0.9));
+      leakMat.opacity = 0.22 + 0.28 * (0.5 + 0.5 * Math.sin(t * 0.9));
 
-      // Centre decision node + branch pulses (green favoured, red quieter)
-      decideNode.userData.core.material.emissiveIntensity = 0.45 + 0.2 * Math.sin(t * 0.8);
-      decideRing.rotation.z = t * 0.15;
-      lineA.material.opacity = 0.3 + 0.3 * (0.5 + 0.5 * Math.sin(t * 1.1));
-      nodeA.userData.core.material.emissiveIntensity = 0.5 + 0.35 * (0.5 + 0.5 * Math.sin(t * 1.1));
-      lineB.material.opacity = 0.18 + 0.22 * (0.5 + 0.5 * Math.sin(t * 1.6 + 1.0));
-      nodeB.userData.core.material.emissiveIntensity = 0.35 + 0.3 * (0.5 + 0.5 * Math.sin(t * 1.6 + 1.0));
+      // Centre decision: slow rotating ring, green branch favoured
+      decideRing.rotation.z = t * 0.18;
+      lineA.material.opacity = 0.38 + 0.28 * (0.5 + 0.5 * Math.sin(t * 1.0));
+      nodeA.userData.ring.material.opacity = 0.6 + 0.3 * (0.5 + 0.5 * Math.sin(t * 1.0));
+      lineB.material.opacity = 0.25 + 0.18 * (0.5 + 0.5 * Math.sin(t * 1.5 + 1.0));
       ctrGroup.position.y = CTR_Y + Math.sin(t * 0.4) * 0.04;
 
-      // NVIDIA stack: a soft glow rising through the five layers
-      var head = (t * 0.55) % 5;
+      // NVIDIA stack: a soft emphasis rising through the five layers
+      var head = (t * 0.5) % 5;
       layers.forEach(function (L, i) {
         var dist = Math.abs(i - head); dist = Math.min(dist, 5 - dist);
         var lift = Math.max(0, 1 - dist);
-        L.plate.material.emissiveIntensity = L.base + lift * 0.6;
-        L.plate.position.x = lift * 0.08;
+        L.r.userData.edges.material.opacity = 0.5 + lift * 0.4;
+        L.r.userData.fill.material.opacity = 0.04 + lift * 0.12;
+        L.r.position.x = lift * 0.07;
       });
-      nvGroup.rotation.y = Math.sin(t * 0.09) * 0.1;
       pathDots.forEach(function (d, i) {
         var ph = Math.sin(t * 1.0 - i * 0.9);
-        d.material.emissiveIntensity = 0.45 + 0.6 * Math.max(0, ph);
-        d.scale.setScalar(1 + 0.3 * Math.max(0, ph));
+        d.userData.disc.material.opacity = 0.12 + 0.25 * Math.max(0, ph);
+        d.scale.setScalar(1 + 0.28 * Math.max(0, ph));
       });
 
-      camera.position.x = Math.sin(t * 0.06) * 0.3;
+      camera.position.x = Math.sin(t * 0.06) * 0.28;
       camera.lookAt(0, -1.4, 0);
       renderer.render(scene, camera);
     }
