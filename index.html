@@ -306,38 +306,48 @@
     var camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
     camera.position.set(0, 0.2, 19);
 
-    // Deep print accents (legible line-art on ivory)
-    var BLUE = 0x3E6B99, GREEN = 0x4F8A30, OCHRE = 0xA8792B, TERRA = 0xA8442E, INK = 0x2b2824;
+    // Deep print accents for line-art (rings, edges, connectors)
+    var BLUE = 0x3E6B99, GREEN = 0x4F8A30, OCHRE = 0xA8792B, TERRA = 0xA8442E;
+    // Darker, bolder variants for label text (max legibility on ivory)
+    var T_BLUE = "#2c5078", T_GREEN = "#3a7320", T_OCHRE = "#876010", T_TERRA = "#8c3120", T_INK = "#211f1a";
 
-    // ---- Text sprite — charcoal/accent ink, faint paper halo for legibility ----
+    // ---- Text sprite — bold ink on a subtle paper chip so it always reads ----
+    var FONT = "700 %FSpx Inter, 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', Helvetica, Arial, sans-serif";
     function label(text, fillCss, scale) {
-      scale = scale || 1;
-      var pad = 28, fs = 56;
+      scale = scale || 1; fillCss = fillCss || T_INK;
+      var fs = 52, padX = 32, padY = 18, rad = 18;
       var cnv = document.createElement("canvas");
       var ctx = cnv.getContext("2d");
-      ctx.font = "600 " + fs + "px Inter, Helvetica, Arial, sans-serif";
+      ctx.font = FONT.replace("%FS", fs);
       var w = ctx.measureText(text).width;
-      cnv.width = Math.ceil(w + pad * 2);
-      cnv.height = fs + pad * 2;
+      cnv.width = Math.ceil(w + padX * 2);
+      cnv.height = fs + padY * 2;
       ctx = cnv.getContext("2d");
-      ctx.font = "600 " + fs + "px Inter, Helvetica, Arial, sans-serif";
+      var W = cnv.width, H = cnv.height;
+      // paper chip
+      ctx.beginPath();
+      ctx.moveTo(rad, 0); ctx.arcTo(W, 0, W, H, rad); ctx.arcTo(W, H, 0, H, rad);
+      ctx.arcTo(0, H, 0, 0, rad); ctx.arcTo(0, 0, W, 0, rad); ctx.closePath();
+      ctx.fillStyle = "rgba(246,243,236,0.86)"; ctx.fill();
+      ctx.globalAlpha = 0.30; ctx.lineWidth = 2.5; ctx.strokeStyle = fillCss; ctx.stroke();
+      ctx.globalAlpha = 1;
+      // text
+      ctx.font = FONT.replace("%FS", fs);
       ctx.textBaseline = "middle"; ctx.textAlign = "center";
-      ctx.shadowColor = "rgba(244,241,234,0.95)"; ctx.shadowBlur = 8;   // paper halo
-      ctx.fillStyle = fillCss || "#2b2824";
-      ctx.fillText(text, cnv.width / 2, cnv.height / 2);
+      ctx.fillStyle = fillCss;
+      ctx.fillText(text, W / 2, H / 2 + 1);
       var tex = new THREE.CanvasTexture(cnv); tex.anisotropy = 4;
-      var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.96, depthTest: false }));
-      sp.scale.set((cnv.width / cnv.height) * 1.02 * scale, 1.02 * scale, 1);
+      var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+      sp.scale.set((W / H) * 0.92 * scale, 0.92 * scale, 1);
       sp.renderOrder = 10;
       return sp;
     }
-    function css(hex){ return "#" + ("000000" + hex.toString(16)).slice(-6); }
 
     // ---- Line-art node: thin ring + faint disc ----
     function node(r, hex, fillOp) {
       var g = new THREE.Group();
-      var ring = new THREE.Mesh(new THREE.TorusGeometry(r, Math.max(0.018, r * 0.05), 10, 56),
-        new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.8 }));
+      var ring = new THREE.Mesh(new THREE.TorusGeometry(r, Math.max(0.024, r * 0.07), 10, 56),
+        new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: 0.92 }));
       g.add(ring);
       var disc = new THREE.Mesh(new THREE.CircleGeometry(r * 0.95, 44),
         new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: fillOp == null ? 0.07 : fillOp }));
@@ -369,62 +379,64 @@
 
     var cubeGrp = new THREE.Group(); ibmGroup.add(cubeGrp);
     var cubeFill = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.0, 2.0),
-      new THREE.MeshBasicMaterial({ color: BLUE, transparent: true, opacity: 0.05 })); cubeGrp.add(cubeFill);
+      new THREE.MeshBasicMaterial({ color: BLUE, transparent: true, opacity: 0.06 })); cubeGrp.add(cubeFill);
     var cubeEdges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(2.0, 2.0, 2.0)),
-      new THREE.LineBasicMaterial({ color: BLUE, transparent: true, opacity: 0.7 })); cubeGrp.add(cubeEdges);
-    ibmGroup.add((function(){ var l = label("IBM PC", css(BLUE), 0.95); l.position.set(0, 1.8, 0); return l; })());
+      new THREE.LineBasicMaterial({ color: BLUE, transparent: true, opacity: 0.85 })); cubeGrp.add(cubeEdges);
+    ibmGroup.add((function(){ var l = label("IBM PC：只剩硬體", T_BLUE, 0.92); l.position.set(0, 1.9, 0); return l; })());
 
-    var satNames = ["Intel", "Microsoft", "Clone Makers"];
+    // Each satellite captured a value layer and drifted away from IBM
+    var satNames = ["Intel：掌 CPU", "微軟：掌 OS", "相容機：複製硬體"];
     var satellites = [];
     satNames.forEach(function (n, i) {
-      var s = node(0.42, BLUE, 0.06);
+      var s = node(0.4, BLUE, 0.07);
       var ang = (i / 3) * Math.PI * 2;
       var dir = new THREE.Vector3(Math.cos(ang) * 1.0, Math.sin(ang) * 0.55 + 0.1, Math.sin(ang) * 0.5).normalize();
       s.position.copy(dir).multiplyScalar(2.3);
-      var lb = label(n, css(BLUE), 0.56); lb.position.set(0, 0.8, 0); s.add(lb);
+      var lb = label(n, T_BLUE, 0.5); lb.position.set(0, 0.82, 0); s.add(lb);
       ibmGroup.add(s);
       satellites.push({ mesh: s, dir: dir, phase: i * 1.7 });
     });
 
-    var leakMat = new THREE.LineBasicMaterial({ color: TERRA, transparent: true, opacity: 0.5 });
+    var leakMat = new THREE.LineBasicMaterial({ color: TERRA, transparent: true, opacity: 0.7 });
     ibmGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(
       [new THREE.Vector3(0.7,-0.6,0), new THREE.Vector3(4.2,-2.4,0)]), leakMat));
-    ibmGroup.add((function(){ var l = label("Value Leakage", css(TERRA), 0.54); l.position.set(4.4,-2.8,0); return l; })());
+    ibmGroup.add((function(){ var l = label("利潤外流 →", T_TERRA, 0.54); l.position.set(4.4,-2.8,0); return l; })());
 
     /* ===================== CENTER — branching decision node ===================== */
     var CTR_Y = Y - 0.8;
     var ctrGroup = new THREE.Group(); ctrGroup.position.set(0, CTR_Y, 0); scene.add(ctrGroup);
 
-    var decideNode = node(0.7, OCHRE, 0.08); decideNode.position.set(-1.4, 0, 0); ctrGroup.add(decideNode);
-    var decideRing = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.016, 10, 64),
-      new THREE.MeshBasicMaterial({ color: OCHRE, transparent: true, opacity: 0.45 }));
+    var decideNode = node(0.7, OCHRE, 0.09); decideNode.position.set(-1.4, 0, 0); ctrGroup.add(decideNode);
+    var decideRing = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.018, 10, 64),
+      new THREE.MeshBasicMaterial({ color: OCHRE, transparent: true, opacity: 0.6 }));
     decideRing.position.set(-1.4, 0, 0); ctrGroup.add(decideRing);
-    ctrGroup.add((function(){ var l = label("端側 Runtime?", css(OCHRE), 0.58); l.position.set(-1.4, 1.1, 0); return l; })());
+    ctrGroup.add((function(){ var l = label("端側 Runtime 之爭", T_OCHRE, 0.56); l.position.set(-1.4, 1.15, 0); return l; })());
 
+    // Branch A = the win (CUDA platform) · Branch B = the loss (commodity hardware)
     var aPos = new THREE.Vector3(2.3, 1.0, 0);
     var bPos = new THREE.Vector3(2.3, -1.1, 0);
     var nodeStart = new THREE.Vector3(-1.4, 0, 0);
-    var lineA = lineBetween(nodeStart, aPos, GREEN, 0.55); ctrGroup.add(lineA);
-    var lineB = lineBetween(nodeStart, bPos, TERRA, 0.4); ctrGroup.add(lineB);
+    var lineA = lineBetween(nodeStart, aPos, GREEN, 0.8); ctrGroup.add(lineA);
+    var lineB = lineBetween(nodeStart, bPos, TERRA, 0.45); ctrGroup.add(lineB);
 
-    var nodeA = node(0.5, GREEN, 0.09); nodeA.position.copy(aPos); ctrGroup.add(nodeA);
-    var labA = label("CUDA Extension", css(GREEN), 0.56); labA.position.set(2.5, 1.7, 0); ctrGroup.add(labA);
-    var nodeB = node(0.46, TERRA, 0.07); nodeB.position.copy(bPos); ctrGroup.add(nodeB);
-    var labB = label("Android Hardware", css(TERRA), 0.52); labB.position.set(2.5, -1.75, 0); ctrGroup.add(labB);
+    var nodeA = node(0.52, GREEN, 0.11); nodeA.position.copy(aPos); ctrGroup.add(nodeA);
+    var labA = label("CUDA 延伸：成為平台", T_GREEN, 0.54); labA.position.set(2.7, 1.7, 0); ctrGroup.add(labA);
+    var nodeB = node(0.44, TERRA, 0.07); nodeB.position.copy(bPos); ctrGroup.add(nodeB);
+    var labB = label("Android 化：淪為零件", T_TERRA, 0.5); labB.position.set(2.7, -1.78, 0); ctrGroup.add(labB);
 
     /* ===================== RIGHT — five stacked control layers ===================== */
     var nvGroup = new THREE.Group(); nvGroup.position.set(8.4, Y - 0.2, 0); scene.add(nvGroup);
 
-    var layerNames = ["Compute", "Runtime", "Agent Layer", "Distribution", "Escalation"];
+    var layerNames = ["運算層", "執行層 Runtime", "代理層 Agent", "通路層", "升級路徑"];
     var layers = [];
     var gap = 0.68, baseY = -1.25;
     for (var i = 0; i < 5; i++) {
       var top = (i === 4);
       var col = top ? OCHRE : GREEN;
-      var r = rect(3.0 - i * 0.08, 0.5, col, 0.05);
+      var r = rect(3.1 - i * 0.08, 0.52, col, 0.06);
       r.position.set(0, baseY + i * gap, 0);
       nvGroup.add(r);
-      var lb = label(layerNames[i], css(col), 0.46);
+      var lb = label(layerNames[i], top ? T_OCHRE : T_GREEN, 0.44);
       lb.position.set(0, baseY + i * gap, 0.05);
       nvGroup.add(lb);
       layers.push({ r: r });
@@ -433,12 +445,12 @@
     // Escalation path: AI PC -> Workstation -> DGX / Cloud
     var pathPts = [new THREE.Vector3(-2.6, -1.9, 0), new THREE.Vector3(0, -2.12, 0), new THREE.Vector3(2.6, -2.34, 0)];
     nvGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pathPts),
-      new THREE.LineBasicMaterial({ color: GREEN, transparent: true, opacity: 0.5 })));
+      new THREE.LineBasicMaterial({ color: GREEN, transparent: true, opacity: 0.65 })));
     var pathDots = [];
     pathPts.forEach(function (p) {
-      var d = node(0.14, GREEN, 0.18); d.position.copy(p); nvGroup.add(d); pathDots.push(d);
+      var d = node(0.14, GREEN, 0.2); d.position.copy(p); nvGroup.add(d); pathDots.push(d);
     });
-    nvGroup.add((function(){ var l = label("AI PC → Workstation → DGX / Cloud", css(GREEN), 0.5); l.position.set(0, -2.85, 0); return l; })());
+    nvGroup.add((function(){ var l = label("AI PC → 工作站 → DGX / 雲", T_GREEN, 0.5); l.position.set(0, -2.9, 0); return l; })());
 
     /* ===================== Resize ===================== */
     function resize() {
@@ -459,19 +471,19 @@
       // IBM cube slowly rotating (wireframe), edges fading as control weakens
       cubeGrp.rotation.y = t * 0.12;
       cubeGrp.rotation.x = Math.sin(t * 0.18) * 0.12;
-      cubeEdges.material.opacity = 0.45 + 0.25 * (0.5 + 0.5 * Math.sin(t * 0.5));
+      cubeEdges.material.opacity = 0.65 + 0.2 * (0.5 + 0.5 * Math.sin(t * 0.5));
       satellites.forEach(function (s) {
         var d = 2.3 * (1 + (0.5 + 0.5 * Math.sin(t * 0.12 + s.phase)) * 0.38);
         s.mesh.position.copy(s.dir).multiplyScalar(d);
-        s.mesh.userData.ring.material.opacity = 0.55 + 0.25 * Math.sin(t * 0.6 + s.phase);
+        s.mesh.userData.ring.material.opacity = 0.75 + 0.18 * Math.sin(t * 0.6 + s.phase);
       });
-      leakMat.opacity = 0.22 + 0.28 * (0.5 + 0.5 * Math.sin(t * 0.9));
+      leakMat.opacity = 0.45 + 0.3 * (0.5 + 0.5 * Math.sin(t * 0.9));
 
-      // Centre decision: slow rotating ring, green branch favoured
+      // Centre decision: slow rotating ring, green (winning) branch emphasised
       decideRing.rotation.z = t * 0.18;
-      lineA.material.opacity = 0.38 + 0.28 * (0.5 + 0.5 * Math.sin(t * 1.0));
-      nodeA.userData.ring.material.opacity = 0.6 + 0.3 * (0.5 + 0.5 * Math.sin(t * 1.0));
-      lineB.material.opacity = 0.25 + 0.18 * (0.5 + 0.5 * Math.sin(t * 1.5 + 1.0));
+      lineA.material.opacity = 0.6 + 0.3 * (0.5 + 0.5 * Math.sin(t * 1.0));
+      nodeA.userData.ring.material.opacity = 0.8 + 0.18 * (0.5 + 0.5 * Math.sin(t * 1.0));
+      lineB.material.opacity = 0.32 + 0.15 * (0.5 + 0.5 * Math.sin(t * 1.5 + 1.0));
       ctrGroup.position.y = CTR_Y + Math.sin(t * 0.4) * 0.04;
 
       // NVIDIA stack: a soft emphasis rising through the five layers
@@ -479,8 +491,8 @@
       layers.forEach(function (L, i) {
         var dist = Math.abs(i - head); dist = Math.min(dist, 5 - dist);
         var lift = Math.max(0, 1 - dist);
-        L.r.userData.edges.material.opacity = 0.5 + lift * 0.4;
-        L.r.userData.fill.material.opacity = 0.04 + lift * 0.12;
+        L.r.userData.edges.material.opacity = 0.62 + lift * 0.33;
+        L.r.userData.fill.material.opacity = 0.05 + lift * 0.13;
         L.r.position.x = lift * 0.07;
       });
       pathDots.forEach(function (d, i) {
