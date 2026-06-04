@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI PC：NVIDIA 如何避免 IBM PC 的悲劇？</title>
+<style>
+  :root{
+    --ibm-blue:#2f7bff;
+    --ibm-blue-soft:rgba(47,123,255,0.16);
+    --nv-green:#76ff3c;
+    --nv-green-soft:rgba(118,255,60,0.14);
+    --gold:#ffd66e;
+    --bg-0:#04060d;
+    --bg-1:#080d1a;
+    --txt:#e9eef7;
+    --txt-dim:#9aa7bd;
+    --card-bg:rgba(14,20,34,0.34);
+    --card-brd:rgba(255,255,255,0.10);
+    --font: "Helvetica Neue", "PingFang TC", "Microsoft JhengHei",
+            "Noto Sans TC", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    --mono: "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0; }
+
+  html,body{
+    width:100%; height:100%;
+    overflow:hidden;                 /* no scrolling */
+    background:
+      radial-gradient(1200px 700px at 18% 22%, rgba(47,123,255,0.10), transparent 60%),
+      radial-gradient(1200px 700px at 82% 28%, rgba(118,255,60,0.09), transparent 60%),
+      radial-gradient(900px 600px at 50% 8%, rgba(255,214,110,0.06), transparent 60%),
+      linear-gradient(180deg, var(--bg-1), var(--bg-0));
+    color:var(--txt);
+    font-family:var(--font);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* 3D background canvas */
+  #scene{
+    position:fixed; inset:0;
+    width:100%; height:100%;
+    display:block; z-index:0;
+    pointer-events:none;
+  }
+
+  /* Overlay UI grid */
+  #ui{
+    position:fixed; inset:0;
+    z-index:2;
+    display:grid;
+    grid-template-rows: clamp(64px, 12vh, 120px) 1fr clamp(52px, 9vh, 88px);
+    padding: clamp(10px, 1.6vh, 22px) clamp(14px, 1.8vw, 34px);
+    gap: clamp(6px, 1vh, 14px);
+    pointer-events:none;
+  }
+  #ui *{ pointer-events:auto; }
+
+  /* ---------- Header ---------- */
+  header{ text-align:center; display:flex; flex-direction:column; justify-content:center; gap:.35em; }
+  header h1{
+    font-size: clamp(20px, 2.7vw, 42px);
+    font-weight:700; letter-spacing:.5px; line-height:1.1;
+    background:linear-gradient(90deg, var(--ibm-blue), #eaf1ff 42%, #fff 50%, #eafff0 58%, var(--nv-green));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    text-shadow:0 0 40px rgba(255,255,255,0.05);
+  }
+  header p.sub{
+    font-size: clamp(11px, 1.05vw, 16px);
+    color:var(--txt-dim); font-weight:400; letter-spacing:.3px;
+  }
+
+  /* ---------- Main 3 columns ---------- */
+  main{
+    display:grid;
+    grid-template-columns: 1fr 1.06fr 1fr;
+    gap: clamp(8px, 1.1vw, 20px);
+    min-height:0;
+  }
+
+  .col{ display:flex; flex-direction:column; min-height:0; gap: clamp(6px,.9vh,12px); }
+
+  .card{
+    background:var(--card-bg);
+    border:1px solid var(--card-brd);
+    border-radius:14px;
+    backdrop-filter: blur(9px) saturate(120%);
+    -webkit-backdrop-filter: blur(9px) saturate(120%);
+    padding: clamp(8px,1.3vh,16px) clamp(10px,1vw,18px);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+    min-height:0;
+  }
+  .card.grow{ flex:1; overflow:hidden; }
+
+  .card-title{
+    font-size: clamp(13px, 1.25vw, 20px);
+    font-weight:700; margin-bottom:.5em; letter-spacing:.3px;
+    display:flex; align-items:center; gap:.5em;
+  }
+  .dot{ width:.6em; height:.6em; border-radius:50%; flex:none; }
+
+  .ibm .card-title, .ibm .accent{ color:#bfd4ff; }
+  .ibm .card{ border-color:rgba(47,123,255,0.28); box-shadow:0 10px 40px rgba(0,0,0,.35), inset 0 0 28px rgba(47,123,255,0.06); }
+  .ibm .dot{ background:var(--ibm-blue); box-shadow:0 0 14px var(--ibm-blue); }
+
+  .nv .card-title, .nv .accent{ color:#cfffb8; }
+  .nv .card{ border-color:rgba(118,255,60,0.26); box-shadow:0 10px 40px rgba(0,0,0,.35), inset 0 0 28px rgba(118,255,60,0.05); }
+  .nv .dot{ background:var(--nv-green); box-shadow:0 0 14px var(--nv-green); }
+
+  .center .card-title{ color:var(--gold); }
+  .center .card{ border-color:rgba(255,214,110,0.30); box-shadow:0 10px 40px rgba(0,0,0,.4), inset 0 0 30px rgba(255,214,110,0.06); }
+  .center .dot{ background:var(--gold); box-shadow:0 0 16px var(--gold); }
+
+  /* flow list (IBM) */
+  .flow{ list-style:none; display:flex; flex-direction:column; gap:.18em; }
+  .flow li{
+    font-size: clamp(10px, .95vw, 14px); color:var(--txt);
+    position:relative; padding-left:1.05em; line-height:1.35;
+  }
+  .flow li::before{ content:"▸"; position:absolute; left:0; color:var(--ibm-blue); opacity:.85; }
+  .flow li.start::before{ content:"●"; color:var(--ibm-blue); }
+  .flow li.result{ color:#ff9b6b; font-weight:600; }
+  .flow li.result::before{ content:"⚠"; color:#ff7a45; }
+
+  .keyline{
+    font-size: clamp(10px,.95vw,14px); line-height:1.4;
+    font-style:italic; color:var(--txt-dim);
+    border-left:2px solid currentColor; padding-left:.7em; margin-top:.2em;
+  }
+  .ibm .keyline{ color:#9dbcff; }
+  .nv .keyline{ color:#a9f08a; }
+
+  /* center */
+  .answer{
+    font-size: clamp(16px, 1.7vw, 26px); font-weight:800; color:#fff;
+    text-align:center; letter-spacing:1px; margin:.1em 0 .35em;
+    text-shadow:0 0 24px rgba(255,214,110,.35);
+  }
+  .cmp{ display:grid; grid-template-columns:1fr 1fr; gap: clamp(6px,.7vw,12px); }
+  .cmp h4{ font-size:clamp(10px,.95vw,14px); margin-bottom:.3em; }
+  .cmp .pc h4{ color:var(--nv-green); }
+  .cmp .dc h4{ color:var(--ibm-blue); }
+  .cmp ul{ list-style:none; display:flex; flex-direction:column; gap:.12em; }
+  .cmp li{ font-size:clamp(9px,.82vw,12.5px); color:var(--txt); padding-left:.9em; position:relative; line-height:1.3; }
+  .cmp .pc li::before{ content:"+"; position:absolute; left:0; color:var(--nv-green); }
+  .cmp .dc li::before{ content:"+"; position:absolute; left:0; color:var(--ibm-blue); }
+  .conclude{ display:flex; flex-direction:column; gap:.2em; margin-top:.3em; text-align:center; }
+  .conclude span{ font-size:clamp(10px,.95vw,14px); font-weight:600; }
+  .conclude .a{ color:var(--nv-green); }
+  .conclude .b{ color:var(--ibm-blue); }
+
+  /* layer lists (NVIDIA) */
+  .layer h4{ font-size:clamp(10px,.95vw,14px); margin-bottom:.3em; }
+  .layer.open h4{ color:#cfffb8; }
+  .layer.lock h4{ color:var(--gold); }
+  .layer ul{ list-style:none; display:flex; flex-wrap:wrap; gap:.25em .4em; }
+  .layer li{
+    font-size:clamp(9px,.82vw,12.5px); line-height:1.2;
+    padding:.18em .55em; border-radius:6px;
+    background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.07);
+  }
+  .layer.open li{ border-color:rgba(118,255,60,0.30); color:#daffc8; }
+  .layer.lock li{ border-color:rgba(255,214,110,0.32); color:#ffe9b0; background:rgba(255,214,110,0.05); }
+
+  /* ---------- Bottom conclusion ---------- */
+  footer{
+    display:flex; align-items:center; justify-content:center;
+    text-align:center;
+    border-radius:14px;
+    background:linear-gradient(90deg, rgba(47,123,255,0.12), rgba(255,214,110,0.10), rgba(118,255,60,0.12));
+    border:1px solid rgba(255,255,255,0.12);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter:blur(8px);
+    padding: 0 clamp(12px,2vw,28px);
+  }
+  footer p{ font-size: clamp(11px, 1.25vw, 19px); font-weight:600; letter-spacing:.3px; }
+  footer .risk{ color:#ff8a5c; }
+
+  /* WebGL fallback note */
+  #fallback-note{
+    position:fixed; bottom:8px; left:50%; transform:translateX(-50%);
+    z-index:5; font-size:11px; color:var(--txt-dim);
+    background:rgba(0,0,0,.4); padding:4px 10px; border-radius:8px;
+    border:1px solid rgba(255,255,255,.08); display:none;
+  }
+
+  /* Tight / short screens */
+  @media (max-height:620px){
+    .flow li, .keyline, .cmp li, .layer li{ line-height:1.18; }
+  }
+</style>
+</head>
+<body>
+  <!-- Three.js 3D background (graceful fallback below) -->
+  <canvas id="scene"></canvas>
+
+  <!-- All textual content is plain HTML so it works even if WebGL fails -->
+  <div id="ui">
+    <header>
+      <h1>AI PC：NVIDIA 如何避免 IBM PC 的悲劇？</h1>
+      <p class="sub">IBM 贏了標準，卻輸了價值控制權。NVIDIA 不能重犯同樣錯誤。</p>
+    </header>
+
+    <main>
+      <!-- LEFT : IBM -->
+      <section class="col ibm">
+        <div class="card grow">
+          <div class="card-title"><span class="dot"></span>IBM PC：開放後失控</div>
+          <ul class="flow">
+            <li class="start">1981 IBM PC 推出</li>
+            <li>CPU 外包 Intel</li>
+            <li>OS 外包 Microsoft</li>
+            <li>開放架構催生相容機</li>
+            <li>Compaq / Dell / HP 複製硬體</li>
+            <li>IBM 只剩低毛利硬體品牌</li>
+            <li class="result">結果：標準做大，利潤被別人拿走</li>
+          </ul>
+          <p class="keyline">「IBM 建立了 PC 標準，但 Microsoft 與 Intel 控制了真正的價值層。」</p>
+        </div>
+      </section>
+
+      <!-- CENTER : Strategic question -->
+      <section class="col center">
+        <div class="card grow">
+          <div class="card-title"><span class="dot"></span>AI PC 會不會取代 NVIDIA 主機算力？</div>
+          <div class="answer">不會。會分工。</div>
+          <div class="cmp">
+            <div class="pc">
+              <h4>AI PC 適合</h4>
+              <ul>
+                <li>本機 Agent</li>
+                <li>私人文件 RAG</li>
+                <li>離線 LLM</li>
+                <li>低延遲創作工具</li>
+                <li>隱私敏感任務</li>
+              </ul>
+            </div>
+            <div class="dc">
+              <h4>Data Center 適合</h4>
+              <ul>
+                <li>大模型訓練</li>
+                <li>企業級推論</li>
+                <li>多 GPU 叢集</li>
+                <li>Fine-tuning</li>
+                <li>AI Factory</li>
+              </ul>
+            </div>
+          </div>
+          <div class="conclude">
+            <span class="a">AI PC = 個人 AI 終端</span>
+            <span class="b">Data Center = 大規模 AI 工廠</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT : NVIDIA -->
+      <section class="col nv">
+        <div class="card grow">
+          <div class="card-title"><span class="dot"></span>NVIDIA：開放硬體，鎖住價值層</div>
+          <div class="layer open">
+            <h4>可以開放</h4>
+            <ul>
+              <li>OEM 做 AI PC</li>
+              <li>外觀 / 散熱 / 規格</li>
+              <li>RTX GPU 進入更多終端</li>
+            </ul>
+          </div>
+          <div class="layer lock" style="margin-top:.45em">
+            <h4>必須控制</h4>
+            <ul>
+              <li>CUDA</li>
+              <li>TensorRT</li>
+              <li>NIM</li>
+              <li>RTX AI Stack</li>
+              <li>Local Agent Runtime</li>
+              <li>Model Optimization</li>
+              <li>PC-to-Cloud Upgrade Path</li>
+            </ul>
+          </div>
+          <p class="keyline">「開放的是終端設備；鎖住的是 AI runtime 與開發者生態。」</p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>AI PC 不會殺死 NVIDIA 主機算力。真正風險是：<span class="risk">NVIDIA 失去 AI runtime 的控制權。</span></p>
+    </footer>
+  </div>
+
+  <div id="fallback-note">WebGL 無法啟用 — 已切換為靜態簡報模式。</div>
+
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script>
+  (function () {
+    "use strict";
+
+    // ---- WebGL capability check (fallback = static HTML cards already present) ----
+    function webglOK() {
+      try {
+        var c = document.createElement("canvas");
+        return !!(window.WebGLRenderingContext &&
+          (c.getContext("webgl") || c.getContext("experimental-webgl")));
+      } catch (e) { return false; }
+    }
+
+    if (typeof THREE === "undefined" || !webglOK()) {
+      var note = document.getElementById("fallback-note");
+      if (note) note.style.display = "block";
+      var cv = document.getElementById("scene");
+      if (cv) cv.style.display = "none";
+      return; // Content cards remain fully readable.
+    }
+
+    var canvas = document.getElementById("scene");
+    var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+    renderer.setClearColor(0x000000, 0);
+
+    var scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x04060d, 0.018);
+
+    var camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+    camera.position.set(0, 0.4, 19);
+    camera.lookAt(0, -1.2, 0);
+
+    // ---- Lighting ----
+    scene.add(new THREE.AmbientLight(0x404a63, 1.0));
+    var key = new THREE.PointLight(0xffffff, 0.8, 0); key.position.set(0, 8, 14); scene.add(key);
+
+    var IBM = 0x2f7bff, NV = 0x76ff3c, GOLD = 0xffd66e, RED = 0xff6a3c;
+
+    // ---- Text sprite helper (canvas texture) ----
+    function label(text, hex, scale) {
+      scale = scale || 1;
+      var pad = 24, fs = 64;
+      var cnv = document.createElement("canvas");
+      var ctx = cnv.getContext("2d");
+      ctx.font = "600 " + fs + "px Helvetica, Arial, sans-serif";
+      var w = ctx.measureText(text).width;
+      cnv.width = Math.ceil(w + pad * 2);
+      cnv.height = fs + pad * 2;
+      ctx = cnv.getContext("2d");
+      ctx.font = "600 " + fs + "px Helvetica, Arial, sans-serif";
+      ctx.textBaseline = "middle"; ctx.textAlign = "center";
+      var col = "#" + ("000000" + hex.toString(16)).slice(-6);
+      ctx.shadowColor = col; ctx.shadowBlur = 22;
+      ctx.fillStyle = "#f4f8ff";
+      ctx.fillText(text, cnv.width / 2, cnv.height / 2);
+      var tex = new THREE.CanvasTexture(cnv);
+      tex.anisotropy = 4;
+      var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+      sp.scale.set((cnv.width / cnv.height) * 1.15 * scale, 1.15 * scale, 1);
+      sp.renderOrder = 10;
+      return sp;
+    }
+
+    function glowSphere(r, hex, opacity) {
+      var g = new THREE.Group();
+      var core = new THREE.Mesh(
+        new THREE.SphereGeometry(r, 32, 24),
+        new THREE.MeshStandardMaterial({ color: hex, emissive: hex, emissiveIntensity: 1.1, roughness: 0.35, metalness: 0.2 })
+      );
+      g.add(core);
+      var halo = new THREE.Mesh(
+        new THREE.SphereGeometry(r * 1.7, 24, 18),
+        new THREE.MeshBasicMaterial({ color: hex, transparent: true, opacity: opacity == null ? 0.12 : opacity, side: THREE.BackSide })
+      );
+      g.add(halo);
+      g.userData.core = core;
+      return g;
+    }
+
+    // Position clusters slightly low so they read beneath the text cards.
+    var Y = -3.4;
+
+    /* =========================================================
+       LEFT  — IBM: open, then lose control
+       ========================================================= */
+    var ibmGroup = new THREE.Group();
+    ibmGroup.position.set(-8.2, Y, 0);
+    scene.add(ibmGroup);
+
+    var ibmCube = new THREE.Mesh(
+      new THREE.BoxGeometry(2.1, 2.1, 2.1),
+      new THREE.MeshStandardMaterial({ color: IBM, emissive: IBM, emissiveIntensity: 1.0, roughness: 0.3, metalness: 0.35 })
+    );
+    ibmGroup.add(ibmCube);
+    var ibmHalo = new THREE.Mesh(
+      new THREE.BoxGeometry(2.9, 2.9, 2.9),
+      new THREE.MeshBasicMaterial({ color: IBM, transparent: true, opacity: 0.10, side: THREE.BackSide })
+    );
+    ibmGroup.add(ibmHalo);
+    var ibmLbl = label("IBM PC", IBM, 1.05); ibmLbl.position.set(0, 1.9, 0); ibmGroup.add(ibmLbl);
+
+    // Three drifting satellites
+    var satNames = ["Intel", "Microsoft", "Clone Makers"];
+    var satellites = [];
+    satNames.forEach(function (n, i) {
+      var s = glowSphere(0.55, IBM, 0.16);
+      var ang = (i / 3) * Math.PI * 2;
+      var base = new THREE.Vector3(Math.cos(ang) * 2.6, Math.sin(ang) * 1.4 + 0.3, Math.sin(ang) * 1.2);
+      s.position.copy(base);
+      var lb = label(n, IBM, 0.7); lb.position.set(0, 0.95, 0); s.add(lb);
+      ibmGroup.add(s);
+      satellites.push({ mesh: s, dir: base.clone().normalize(), phase: i * 1.7 });
+    });
+
+    // "Value Leakage" red line draining outward
+    var leakMat = new THREE.LineBasicMaterial({ color: RED, transparent: true, opacity: 0.85 });
+    var leakGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0.8, -0.6, 0), new THREE.Vector3(4.6, -2.6, 0)
+    ]);
+    var leakLine = new THREE.Line(leakGeo, leakMat);
+    ibmGroup.add(leakLine);
+    var leakLbl = label("Value Leakage", RED, 0.72); leakLbl.position.set(4.9, -3.0, 0); ibmGroup.add(leakLbl);
+
+    /* =========================================================
+       CENTER — Strategic question
+       ========================================================= */
+    var ctrGroup = new THREE.Group();
+    ctrGroup.position.set(0, Y + 0.3, 0);
+    scene.add(ctrGroup);
+
+    var torus = new THREE.Mesh(
+      new THREE.TorusGeometry(1.7, 0.34, 24, 80),
+      new THREE.MeshStandardMaterial({ color: GOLD, emissive: GOLD, emissiveIntensity: 1.1, roughness: 0.25, metalness: 0.4 })
+    );
+    ctrGroup.add(torus);
+    var torusHalo = new THREE.Mesh(
+      new THREE.TorusGeometry(1.7, 0.6, 16, 60),
+      new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0.10 })
+    );
+    ctrGroup.add(torusHalo);
+    // Question mark dot to complete the "?" feel
+    var qDot = new THREE.Mesh(new THREE.SphereGeometry(0.34, 20, 16),
+      new THREE.MeshStandardMaterial({ color: GOLD, emissive: GOLD, emissiveIntensity: 1.2 }));
+    qDot.position.set(0, -2.55, 0); ctrGroup.add(qDot);
+
+    var qLbl = label("AI PC ≠ Data Center Killer?", GOLD, 0.82);
+    qLbl.position.set(0, 2.7, 0); ctrGroup.add(qLbl);
+
+    // Two pulsing beams: Local AI (green, right) & AI Factory (blue, left)
+    function beam(color, x, name) {
+      var grp = new THREE.Group();
+      var geo = new THREE.CylinderGeometry(0.05, 0.05, 4.2, 8);
+      var mat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.5 });
+      var cyl = new THREE.Mesh(geo, mat);
+      cyl.rotation.z = Math.PI / 2;
+      cyl.position.set(x / 2, -0.1, 0);
+      grp.add(cyl);
+      var end = glowSphere(0.4, color, 0.18); end.position.set(x, -0.1, 0); grp.add(end);
+      var lb = label(name, color, 0.62); lb.position.set(x, 0.85, 0); grp.add(lb);
+      grp.userData.mat = mat; grp.userData.end = end.userData.core;
+      ctrGroup.add(grp);
+      return grp;
+    }
+    var beamLocal = beam(NV, 4.4, "Local AI");
+    var beamFactory = beam(IBM, -4.4, "AI Factory");
+
+    /* =========================================================
+       RIGHT — NVIDIA: open hardware, lock the value layer
+       ========================================================= */
+    var nvGroup = new THREE.Group();
+    nvGroup.position.set(8.2, Y, 0);
+    scene.add(nvGroup);
+
+    var nvCore = glowSphere(1.35, NV, 0.16);
+    nvGroup.add(nvCore);
+    var nvLbl = label("NVIDIA Runtime Core", NV, 0.9); nvLbl.position.set(0, 2.0, 0); nvGroup.add(nvLbl);
+
+    var nodeNames = ["CUDA", "TensorRT", "NIM", "RTX AI", "Agent Runtime", "Cloud Escalation"];
+    var orbitGroup = new THREE.Group(); nvGroup.add(orbitGroup);
+    var orbitR = 3.1;
+    nodeNames.forEach(function (n, i) {
+      var ang = (i / nodeNames.length) * Math.PI * 2;
+      var node = new THREE.Group();
+      node.position.set(Math.cos(ang) * orbitR, Math.sin(ang) * 1.6, Math.sin(ang) * 1.1);
+      var s = glowSphere(0.4, NV, 0.2); node.add(s);
+      var lb = label(n, NV, 0.6); lb.position.set(0, 0.8, 0); node.add(lb);
+      // connecting line to core
+      var lg = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), node.position.clone()]);
+      var ln = new THREE.Line(lg, new THREE.LineBasicMaterial({ color: NV, transparent: true, opacity: 0.22 }));
+      nvGroup.add(ln);
+      orbitGroup.add(node);
+    });
+
+    // Glowing escalation path: PC -> Workstation -> Data Center
+    var pathPts = [new THREE.Vector3(-2.4, -3.0, 0), new THREE.Vector3(0, -3.6, 0), new THREE.Vector3(2.4, -4.2, 0)];
+    var pathLine = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(pathPts),
+      new THREE.LineBasicMaterial({ color: NV, transparent: true, opacity: 0.7 })
+    );
+    nvGroup.add(pathLine);
+    var pathDots = [];
+    ["PC", "Workstation", "Data Center"].forEach(function (n, i) {
+      var d = new THREE.Mesh(new THREE.SphereGeometry(0.18, 14, 12),
+        new THREE.MeshStandardMaterial({ color: NV, emissive: NV, emissiveIntensity: 1.2 }));
+      d.position.copy(pathPts[i]); nvGroup.add(d); pathDots.push(d);
+    });
+    var pathLbl = label("PC → Workstation → Data Center", NV, 0.6);
+    pathLbl.position.set(0, -4.9, 0); nvGroup.add(pathLbl);
+
+    /* =========================================================
+       Resize
+       ========================================================= */
+    function resize() {
+      var w = window.innerWidth, h = window.innerHeight;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    /* =========================================================
+       Animate — subtle, executive-grade
+       ========================================================= */
+    var t0 = performance.now();
+    function animate() {
+      requestAnimationFrame(animate);
+      var t = (performance.now() - t0) / 1000;
+
+      // IBM cube: weaken / pulse fainter over a slow cycle
+      var weak = 0.45 + 0.32 * (0.5 + 0.5 * Math.sin(t * 0.5)); // 0.45..1.09 but trending dim
+      var decay = 0.6 + 0.4 * Math.abs(Math.sin(t * 0.18));     // long slow fade
+      ibmCube.material.emissiveIntensity = weak * decay * 0.9;
+      ibmHalo.material.opacity = 0.06 + 0.05 * decay;
+      ibmGroup.rotation.y = Math.sin(t * 0.12) * 0.18;
+
+      // Satellites drift outward then gently reset (breathing leak)
+      satellites.forEach(function (s) {
+        var d = 1 + (0.5 + 0.5 * Math.sin(t * 0.22 + s.phase)) * 1.6; // 1..2.6 multiplier
+        s.mesh.position.copy(s.dir).multiplyScalar(2.6 * d);
+        s.mesh.position.y += 0.3;
+        s.mesh.userData.core.material.emissiveIntensity = 1.0;
+      });
+      leakMat.opacity = 0.4 + 0.45 * (0.5 + 0.5 * Math.sin(t * 1.4));
+
+      // Center torus slow spin + pulse
+      torus.rotation.x = t * 0.25;
+      torus.rotation.y = t * 0.18;
+      torus.material.emissiveIntensity = 0.9 + 0.4 * Math.sin(t * 1.1);
+      torusHalo.rotation.copy(torus.rotation);
+      qDot.material.emissiveIntensity = 0.9 + 0.5 * Math.sin(t * 1.1);
+
+      var bp = 0.35 + 0.4 * (0.5 + 0.5 * Math.sin(t * 1.6));
+      beamLocal.userData.mat.opacity = bp;
+      beamLocal.userData.end.material.emissiveIntensity = 0.8 + bp;
+      var bp2 = 0.35 + 0.4 * (0.5 + 0.5 * Math.sin(t * 1.6 + Math.PI));
+      beamFactory.userData.mat.opacity = bp2;
+      beamFactory.userData.end.material.emissiveIntensity = 0.8 + bp2;
+
+      // NVIDIA core steady-strong pulse + nodes orbit
+      nvCore.userData.core.material.emissiveIntensity = 1.0 + 0.25 * Math.sin(t * 1.3);
+      orbitGroup.rotation.y = t * 0.28;
+      orbitGroup.rotation.z = Math.sin(t * 0.2) * 0.08;
+
+      // Escalation path pulse along PC->WS->DC
+      pathDots.forEach(function (d, i) {
+        var ph = Math.sin(t * 1.5 - i * 0.9);
+        d.material.emissiveIntensity = 0.7 + 0.8 * Math.max(0, ph);
+        d.scale.setScalar(1 + 0.35 * Math.max(0, ph));
+      });
+
+      // Whole scene very gentle parallax
+      camera.position.x = Math.sin(t * 0.08) * 0.4;
+      camera.lookAt(0, -1.4, 0);
+
+      renderer.render(scene, camera);
+    }
+    animate();
+  })();
+  </script>
+</body>
+</html>
