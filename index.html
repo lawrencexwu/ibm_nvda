@@ -342,6 +342,7 @@
       sp.renderOrder = 10;
       return sp;
     }
+    function css(hex){ return "#" + ("000000" + hex.toString(16)).slice(-6); }
 
     // ---- Line-art node: thin ring + faint disc ----
     function node(r, hex, fillOp) {
