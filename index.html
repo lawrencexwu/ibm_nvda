@@ -140,7 +140,7 @@
   .lyr .n{ flex:none; width:1.5em; height:1.5em; display:grid; place-items:center; border-radius:6px;
     font-size:clamp(9px,.8vw,12px); font-weight:800; color:#04060d; background:var(--nv-green); }
   .lyr .body{ min-width:0; }
-  .lyr .nm{ font-size:clamp(10px,.92vw,13px); font-weight:800; color:#eaffd9; line-height:1.1; }
+  .lyr .nm{ font-size:clamp(10px,.92vw,13px); font-weight:800; color:#eaffd9; line-height:1.1; margin-right:.6em; }
   .lyr .dt{ font-size:clamp(8.5px,.76vw,11px); color:#a9c79a; line-height:1.2; }
   .lyr.top{ background:linear-gradient(90deg, rgba(255,214,110,0.14), rgba(255,214,110,0.02)); border-color:rgba(255,214,110,0.40); }
   .lyr.top .n{ background:var(--gold); }
@@ -347,8 +347,8 @@
         new THREE.LineBasicMaterial({ color: hex, transparent: true, opacity: op == null ? 0.4 : op }));
     }
 
-    // Clusters sit low so the cards (top of screen) never cover them.
-    var Y = -3.3;
+    // Clusters sit in a low band so the cards (top of screen) never cover them.
+    var Y = -5.0;
 
     /* ===================== LEFT — IBM loses control ===================== */
     var ibmGroup = new THREE.Group(); ibmGroup.position.set(-8.4, Y, 0); scene.add(ibmGroup);
@@ -367,7 +367,7 @@
       var s = glowSphere(0.5, IBM, 0.16);
       var ang = (i / 3) * Math.PI * 2;
       var dir = new THREE.Vector3(Math.cos(ang) * 1.0, Math.sin(ang) * 0.55 + 0.12, Math.sin(ang) * 0.5).normalize();
-      s.position.copy(dir).multiplyScalar(2.6);
+      s.position.copy(dir).multiplyScalar(2.3);
       var lb = label(n, IBM, 0.62); lb.position.set(0, 0.9, 0); s.add(lb);
       ibmGroup.add(s);
       satellites.push({ mesh: s, dir: dir, phase: i * 1.7 });
@@ -380,29 +380,30 @@
     ibmGroup.add((function(){ var l = label("Value Leakage", RED, 0.6, "#ffd2cc"); l.position.set(4.4,-2.8,0); return l; })());
 
     /* ===================== CENTER — branching decision node ===================== */
-    var ctrGroup = new THREE.Group(); ctrGroup.position.set(0, Y + 0.2, 0); scene.add(ctrGroup);
+    var CTR_Y = Y - 0.6; // base height for the centre cluster
+    var ctrGroup = new THREE.Group(); ctrGroup.position.set(0, CTR_Y, 0); scene.add(ctrGroup);
 
-    var decideNode = glowSphere(0.85, GOLD, 0.16); decideNode.position.set(-1.4, 0, 0); ctrGroup.add(decideNode);
-    ctrGroup.add((function(){ var l = label("端側 Runtime?", GOLD, 0.66); l.position.set(-1.4, 1.25, 0); return l; })());
+    var decideNode = glowSphere(0.8, GOLD, 0.16); decideNode.position.set(-1.4, 0, 0); ctrGroup.add(decideNode);
+    ctrGroup.add((function(){ var l = label("端側 Runtime?", GOLD, 0.64); l.position.set(-1.4, 1.2, 0); return l; })());
 
     // Branch A (green, up) = CUDA Extension  ·  Branch B (red, down) = Android Hardware
-    var aPos = new THREE.Vector3(2.4, 1.5, 0);
-    var bPos = new THREE.Vector3(2.4, -1.6, 0);
+    var aPos = new THREE.Vector3(2.3, 1.2, 0);
+    var bPos = new THREE.Vector3(2.3, -1.35, 0);
     var nodeStart = new THREE.Vector3(-1.4, 0, 0);
     var lineA = lineBetween(nodeStart, aPos, NV, 0.55); ctrGroup.add(lineA);
     var lineB = lineBetween(nodeStart, bPos, RED, 0.45); ctrGroup.add(lineB);
 
-    var nodeA = glowSphere(0.62, NV, 0.2); nodeA.position.copy(aPos); ctrGroup.add(nodeA);
-    var labA = label("CUDA Extension", NV, 0.62, "#d6ffc2"); labA.position.set(2.6, 2.45, 0); ctrGroup.add(labA);
-    var nodeB = glowSphere(0.55, RED, 0.18); nodeB.position.copy(bPos); ctrGroup.add(nodeB);
-    var labB = label("Android Hardware", RED, 0.58, "#ffcdc7"); labB.position.set(2.6, -2.55, 0); ctrGroup.add(labB);
+    var nodeA = glowSphere(0.58, NV, 0.2); nodeA.position.copy(aPos); ctrGroup.add(nodeA);
+    var labA = label("CUDA Extension", NV, 0.6, "#d6ffc2"); labA.position.set(2.5, 2.0, 0); ctrGroup.add(labA);
+    var nodeB = glowSphere(0.52, RED, 0.18); nodeB.position.copy(bPos); ctrGroup.add(nodeB);
+    var labB = label("Android Hardware", RED, 0.56, "#ffcdc7"); labB.position.set(2.5, -2.1, 0); ctrGroup.add(labB);
 
     /* ===================== RIGHT — five stacked control layers ===================== */
     var nvGroup = new THREE.Group(); nvGroup.position.set(8.4, Y + 0.3, 0); scene.add(nvGroup);
 
     var layerNames = ["Compute", "Runtime", "Agent Layer", "Distribution", "Escalation"];
     var layers = [];
-    var gap = 1.05, baseY = -2.1;
+    var gap = 0.78, baseY = -1.45;
     for (var i = 0; i < 5; i++) {
       var top = (i === 4);
       var col = top ? GOLD : NV;
@@ -418,7 +419,7 @@
     }
 
     // Bright green escalation path: AI PC -> Workstation -> DGX / Cloud
-    var pathPts = [new THREE.Vector3(-2.6, -3.2, 0), new THREE.Vector3(0, -3.7, 0), new THREE.Vector3(2.6, -4.2, 0)];
+    var pathPts = [new THREE.Vector3(-2.6, -2.15, 0), new THREE.Vector3(0, -2.4, 0), new THREE.Vector3(2.6, -2.65, 0)];
     nvGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pathPts),
       new THREE.LineBasicMaterial({ color: NV, transparent: true, opacity: 0.65 })));
     var pathDots = [];
@@ -427,7 +428,7 @@
         new THREE.MeshStandardMaterial({ color: NV, emissive: NV, emissiveIntensity: 1.2 }));
       d.position.copy(p); nvGroup.add(d); pathDots.push(d);
     });
-    nvGroup.add((function(){ var l = label("AI PC → Workstation → DGX / Cloud", NV, 0.55, "#d6ffc2"); l.position.set(0, -4.85, 0); return l; })());
+    nvGroup.add((function(){ var l = label("AI PC → Workstation → DGX / Cloud", NV, 0.55, "#d6ffc2"); l.position.set(0, -3.1, 0); return l; })());
 
     /* ===================== Resize ===================== */
     function resize() {
@@ -451,7 +452,8 @@
       ibmHalo.material.opacity = 0.05 + 0.05 * decay;
       ibmGroup.rotation.y = Math.sin(t * 0.11) * 0.16;
       satellites.forEach(function (s) {
-        var d = 2.6 * (1 + (0.5 + 0.5 * Math.sin(t * 0.2 + s.phase)) * 1.5);
+        // Drift away, but stay inside the left third (never reach the centre)
+        var d = 2.3 * (1 + (0.5 + 0.5 * Math.sin(t * 0.2 + s.phase)) * 0.42);
         s.mesh.position.copy(s.dir).multiplyScalar(d);
       });
       leakMat.opacity = 0.35 + 0.45 * (0.5 + 0.5 * Math.sin(t * 1.3));
@@ -462,7 +464,7 @@
       nodeA.userData.core.material.emissiveIntensity = 1.0 + 0.5 * (0.5 + 0.5 * Math.sin(t * 1.6));
       lineB.material.opacity = 0.25 + 0.35 * (0.5 + 0.5 * Math.sin(t * 2.4 + 1.0));
       nodeB.userData.core.material.emissiveIntensity = 0.6 + 0.6 * (0.5 + 0.5 * Math.sin(t * 2.4 + 1.0));
-      ctrGroup.position.y = (Y + 0.2) + Math.sin(t * 0.5) * 0.05;
+      ctrGroup.position.y = CTR_Y + Math.sin(t * 0.5) * 0.05;
 
       // NVIDIA stack: a glow pulse rising through the five layers
       var head = (t * 0.9) % 5;
