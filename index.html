@@ -234,7 +234,68 @@
     header h1{ font-size:22px; }
     .card-title{ font-size:18px; }
   }
+
+  /* ============ Download-as-image: button, poster, overlay ============ */
+  #dl-btn{
+    position:fixed; z-index:6;
+    right:max(16px,env(safe-area-inset-right,0px));
+    bottom:max(16px,env(safe-area-inset-bottom,0px));
+    font-family:var(--sans); font-size:14px; font-weight:600; color:#F6F3EC; letter-spacing:.02em;
+    background:var(--green); border:none; border-radius:999px; padding:11px 18px;
+    box-shadow:0 8px 22px rgba(60,50,30,0.24); cursor:pointer;
+  }
+  #dl-btn:disabled{ opacity:.6; cursor:default; }
+  #dl-btn:hover{ filter:brightness(1.06); }
+
+  /* off-screen poster source (portrait one-pager, fixed px sizing) */
+  #poster{
+    position:fixed; left:-99999px; top:0; width:1060px;
+    background:linear-gradient(180deg,#F4F1EA,#EDE9DF); color:var(--ink);
+    font-family:var(--sans); padding:56px 56px 40px;
+  }
+  #poster header{ text-align:center; display:flex; flex-direction:column; gap:10px; margin-bottom:32px; }
+  #poster header h1{ font-size:42px; font-weight:600; letter-spacing:-0.015em; line-height:1.1; color:var(--ink); }
+  #poster header h1 .hl{ color:var(--green); }
+  #poster header p.sub{ font-size:18px; line-height:1.5; color:var(--ink-dim); max-width:880px; margin:0 auto; }
+  #poster main{ display:flex; flex-direction:column; gap:20px; }
+  #poster .card{ width:100%; background:#FCFBF7; border:1px solid var(--hair); border-radius:14px;
+    padding:24px 30px; box-shadow:0 6px 20px rgba(60,50,30,0.07); position:relative; }
+  #poster .card::before{ top:24px; height:1.35em; }
+  #poster .eyebrow{ font-size:12px; margin-bottom:10px; }
+  #poster .card-title{ font-size:25px; }
+  #poster .flow{ gap:7px; margin-top:14px; }
+  #poster .flow li{ font-size:16.5px; line-height:1.5; }
+  #poster .lesson{ font-size:16px; margin-top:16px; padding:11px 14px; }
+  #poster .q{ margin-top:16px; padding-top:14px; }
+  #poster .q .qno{ font-size:12px; }
+  #poster .q .qtext{ font-size:17.5px; }
+  #poster .q .ans{ font-size:15px; line-height:1.6; margin-top:7px; }
+  #poster .paths{ grid-template-columns:1fr 1fr; gap:12px; margin-top:11px; }
+  #poster .path{ font-size:13.5px; line-height:1.45; padding:12px 14px; }
+  #poster .stack{ gap:9px; margin-top:14px; }
+  #poster .lyr{ padding:11px 14px; }
+  #poster .lyr .n{ font-size:12.5px; }
+  #poster .lyr .nm{ font-size:15.5px; }
+  #poster .lyr .dt{ font-size:12.5px; }
+  #poster .killbox{ font-size:13.5px; margin-top:16px; padding:12px 15px; line-height:1.5; }
+  #poster footer{ margin-top:28px; border-top:1px solid var(--hair); padding-top:20px; gap:8px;
+    display:flex; flex-direction:column; align-items:center; text-align:center; }
+  #poster footer .concl{ font-size:16px; line-height:1.45; }
+  #poster footer .final{ font-size:19px; }
+  #poster .cap{ text-align:center; margin-top:18px; font-size:12px; color:var(--ink-faint); letter-spacing:.08em; }
+
+  /* result overlay */
+  #shot-overlay{ position:fixed; inset:0; z-index:20; display:none; flex-direction:column;
+    align-items:center; justify-content:center; gap:14px; padding:24px; background:rgba(20,18,14,0.80); }
+  #shot-overlay .hint{ color:#F2EEE5; font-size:14px; text-align:center; max-width:520px; }
+  #shot-overlay img{ max-width:min(92vw,520px); max-height:70vh; border-radius:10px;
+    box-shadow:0 20px 60px rgba(0,0,0,.5); background:#F4F1EA; }
+  #shot-overlay .row{ display:flex; gap:12px; }
+  #shot-overlay .b{ font-family:var(--sans); font-size:14px; font-weight:600; padding:10px 18px;
+    border-radius:999px; border:none; cursor:pointer; text-decoration:none; background:var(--green); color:#F6F3EC; }
+  #shot-overlay .b.ghost{ background:transparent; color:#F2EEE5; border:1px solid rgba(255,255,255,.35); }
 </style>
+
 </head>
 <body>
   <canvas id="scene"></canvas>
@@ -332,7 +393,13 @@
 
   <div id="fallback-note">WebGL 無法啟用 — 已切換為靜態簡報模式。</div>
 
+  <!-- Download one-pager as image -->
+  <button id="dl-btn">⤓ 下載一頁圖片</button>
+  <div id="poster" aria-hidden="true"></div>
+  <div id="shot-overlay"></div>
+
   <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script>
   (function () {
     "use strict";
@@ -577,6 +644,65 @@
       renderer.render(scene, camera);
     }
     animate();
+  })();
+  </script>
+
+  <!-- Export the one-pager as a downloadable image -->
+  <script>
+  (function () {
+    "use strict";
+    var btn = document.getElementById("dl-btn");
+    var poster = document.getElementById("poster");
+    var overlay = document.getElementById("shot-overlay");
+    if (!btn || !poster || !overlay) return;
+
+    function buildPoster() {
+      if (poster.dataset.built) return;
+      ["header", "main", "footer"].forEach(function (sel) {
+        var el = document.querySelector("#ui " + sel);
+        if (el) poster.appendChild(el.cloneNode(true));
+      });
+      var cap = document.createElement("div");
+      cap.className = "cap";
+      cap.textContent = "lawrencexwu.github.io/ibm_nvda";
+      poster.appendChild(cap);
+      poster.dataset.built = "1";
+    }
+
+    function showOverlay(dataUrl) {
+      overlay.innerHTML = "";
+      var hint = document.createElement("p");
+      hint.className = "hint";
+      hint.textContent = "長按圖片即可儲存到相簿（電腦請按「下載 PNG」）";
+      var img = document.createElement("img");
+      img.src = dataUrl; img.alt = "AI PC：NVIDIA 的第二個 CUDA 戰場";
+      var row = document.createElement("div"); row.className = "row";
+      var dl = document.createElement("a");
+      dl.href = dataUrl; dl.download = "AI-PC-NVIDIA-CUDA.png";
+      dl.className = "b"; dl.textContent = "下載 PNG";
+      var close = document.createElement("button");
+      close.className = "b ghost"; close.textContent = "關閉";
+      close.onclick = function () { overlay.style.display = "none"; };
+      row.appendChild(dl); row.appendChild(close);
+      overlay.appendChild(hint); overlay.appendChild(img); overlay.appendChild(row);
+      overlay.style.display = "flex";
+    }
+    overlay.addEventListener("click", function (e) { if (e.target === overlay) overlay.style.display = "none"; });
+
+    btn.addEventListener("click", function () {
+      if (typeof html2canvas === "undefined") { alert("圖片產生器仍在載入，請稍後再試。"); return; }
+      var orig = btn.textContent;
+      btn.textContent = "產生中…"; btn.disabled = true;
+      buildPoster();
+      // wait a tick so fonts/layout settle
+      (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve())
+        .then(function () {
+          return html2canvas(poster, { scale: 2, backgroundColor: "#F4F1EA", useCORS: true, logging: false });
+        })
+        .then(function (canvas) { showOverlay(canvas.toDataURL("image/png")); })
+        .catch(function (err) { alert("產生失敗：" + (err && err.message ? err.message : err)); })
+        .then(function () { btn.textContent = orig; btn.disabled = false; });
+    });
   })();
   </script>
 </body>
