@@ -1,21 +1,31 @@
 //@version=6
 //
-// Dual Momentum (GEM) — BOXX Defense
-// ----------------------------------
+// Dual Momentum (GEM) — Quantitative Momentum Holdings + BOXX Defense
+// -------------------------------------------------------------------
 // A non-repainting implementation of Gary Antonacci's Global Equities Momentum
-// (GEM) strategy, modified to hold BOXX (box-spread cash proxy) instead of AGG
-// during risk-off periods.
+// (GEM) strategy with two modifications:
+//   1. BOXX (box-spread cash proxy) replaces AGG as the risk-off holding.
+//   2. Signals and holdings are decoupled: SPY / VXUS / BIL decide the regime
+//      and geography, while QMOM / IMOM (Alpha Architect quantitative
+//      momentum ETFs) provide the equity exposure actually held.
 //
 // Rules, evaluated once per completed month:
 //   US momentum    = SPY  12-month total return (dividend adjusted)
 //   Intl momentum  = VXUS 12-month total return (dividend adjusted)
 //   Cash hurdle    = BIL (or SHV / BOXX / 3M T-bill yield series) 12-month return
 //
-//   If US momentum <= cash hurdle:  hold the defensive asset (BOXX)
-//   Else:                           hold the stronger of SPY / VXUS
+//   If US momentum <= cash hurdle:        hold BOXX
+//   Else if US momentum >= Intl momentum: hold QMOM
+//   Else:                                 hold IMOM
+//
+// Three selectable modes:
+//   * Baseline   — hold the signal ETFs themselves (classic GEM: SPY/VXUS/BOXX)
+//   * Decoupled  — signal ETFs decide, holding ETFs are owned (default)
+//   * Aggressive — momentum is computed directly on the holding ETFs
+//                  (QMOM vs IMOM vs the cash hurdle)
 //
 // Execution convention (no repainting):
-//   * The signal uses only COMPLETED monthly closes (close[1] on the "M"
+//   * Signals use only COMPLETED monthly closes (close[1] on the "M"
 //     timeframe with lookahead, the standard confirmed-HTF pattern).
 //   * The allocation switches at the start of the next month and is held
 //     until the next rebalance. The synthetic portfolio return for a month is
@@ -28,31 +38,39 @@
 // Recommended chart: SPY, 1M (monthly) timeframe. Daily/weekly charts also
 // work; timeframes above monthly are flagged in the table.
 //
-// Note on history: BOXX launched in Dec 2022, so with a 12-month lookback the
-// backtest can only begin once every configured symbol has enough history
+// History notes: BOXX launched Dec 2022 and QMOM/IMOM launched Dec 2015. The
+// backtest begins once every symbol in use has lookback + 1 completed months
 // (~Jan 2024 with BOXX). Swap the defensive asset to AGG or SHV for a longer
-// backtest window.
+// window; do not overtrust the short QMOM/IMOM live history.
 //
-indicator("Dual Momentum (GEM) — BOXX Defense", "GEM-BOXX", overlay = false, max_labels_count = 500)
+indicator("Dual Momentum (GEM) — QMOM/IMOM + BOXX", "GEM-QM", overlay = false, max_labels_count = 500)
 
 // ── Inputs ──────────────────────────────────────────────────────────────────
-grpA = "Assets"
-usSym    = input.symbol("AMEX:SPY",    "U.S. equity",                          group = grpA)
-intlSym  = input.symbol("NASDAQ:VXUS", "International equity",                 group = grpA)
-defSym   = input.symbol("BATS:BOXX",   "Defensive asset (held when risk-off)", group = grpA)
-benchSym = input.symbol("AMEX:SPY",    "Benchmark (buy & hold)",               group = grpA)
+grpS = "Signal ETFs (decide regime & geography)"
+sigUSSym   = input.symbol("AMEX:SPY",    "U.S. signal",          group = grpS)
+sigIntlSym = input.symbol("NASDAQ:VXUS", "International signal", group = grpS)
+
+grpHo = "Holding ETFs (what the portfolio owns)"
+holdUSSym   = input.symbol("BATS:QMOM", "U.S. holding",          group = grpHo)
+holdIntlSym = input.symbol("BATS:IMOM", "International holding", group = grpHo)
+defSym      = input.symbol("BATS:BOXX", "Defensive holding (risk-off)", group = grpHo)
 
 grpH = "Cash hurdle (absolute momentum)"
 hurdleMode   = input.string("BIL", "Hurdle series", options = ["BIL", "SHV", "BOXX", "3M T-Bill yield (FRED:DTB3)", "Custom"], group = grpH,
-     tooltip = "Benchmark that U.S. equity momentum must beat for equities to be eligible. The defensive asset above is what is actually held when risk-off.")
+     tooltip = "Benchmark that U.S. momentum must beat for equities to be eligible. The defensive holding above is what is actually held when risk-off.")
 hurdleCustom = input.symbol("AMEX:BIL", "Custom hurdle symbol", group = grpH, tooltip = "Used only when Hurdle series = Custom")
 
 grpM = "Model"
+mode = input.string("Decoupled: signal ETFs decide, holding ETFs are owned", "Mode",
+     options = ["Baseline: hold the signal ETFs", "Decoupled: signal ETFs decide, holding ETFs are owned", "Aggressive: signals computed on the holding ETFs"],
+     group = grpM,
+     tooltip = "Baseline = classic GEM (own SPY/VXUS/BOXX). Decoupled = SPY/VXUS/BIL signals, own QMOM/IMOM/BOXX. Aggressive = momentum measured directly on QMOM/IMOM vs the hurdle.")
 lookback = input.int(12,     "Momentum lookback (completed months)", minval = 1, maxval = 60, group = grpM)
 rebEvery = input.int(1,      "Rebalance every N months",             minval = 1, maxval = 12, group = grpM)
 costPct  = input.float(0.05, "Commission per switch (%)",            minval = 0, step = 0.01, group = grpM)
 slipPct  = input.float(0.05, "Slippage per switch (%)",              minval = 0, step = 0.01, group = grpM)
 startCap = input.float(100000, "Starting portfolio value",           minval = 1, group = grpM)
+benchSym = input.symbol("AMEX:SPY", "Benchmark (buy & hold)",        group = grpM)
 
 grpD = "Display"
 showTable    = input.bool(true,  "Show stats table", group = grpD)
@@ -62,6 +80,9 @@ markSwitches = input.bool(true,  "Mark allocation changes", group = grpD)
 paintBg      = input.bool(false, "Color background by allocation", group = grpD)
 showMomPlots = input.bool(false, "Plot momentum values (%)", group = grpD,
      tooltip = "Momentum shares the pane scale with the equity curves; enable only if you hide the equity plots in the style tab.")
+
+baselineMode   = str.startswith(mode, "Baseline")
+aggressiveMode = str.startswith(mode, "Aggressive")
 
 // ── Data (confirmed monthly, dividend adjusted, non-repainting) ─────────────
 f_div(simple string s) =>
@@ -79,9 +100,11 @@ f_mom(simple string s) =>
 f_ret(simple string s) =>
     request.security(f_div(s), "M", close[1] / close[2] - 1, lookahead = barmerge.lookahead_on)
 
-momUS   = f_mom(usSym)
-momIntl = f_mom(intlSym)
-momDef  = f_mom(defSym)
+momSigUS    = f_mom(sigUSSym)
+momSigIntl  = f_mom(sigIntlSym)
+momHoldUS   = f_mom(holdUSSym)
+momHoldIntl = f_mom(holdIntlSym)
+momDef      = f_mom(defSym)
 
 // Price-based hurdle (BIL / SHV / BOXX / custom): trailing total return.
 momHurdlePx = f_mom(hurdleSym)
@@ -90,10 +113,18 @@ momHurdlePx = f_mom(hurdleSym)
 momHurdleYld = request.security(hurdleSym, "M", math.sum(close / 1200.0, lookback)[1], lookahead = barmerge.lookahead_on)
 momHurdle = hurdleIsYield ? momHurdleYld : momHurdlePx
 
-retUS    = f_ret(usSym)
-retIntl  = f_ret(intlSym)
-retDef   = f_ret(defSym)
-retBench = f_ret(benchSym)
+retSigUS    = f_ret(sigUSSym)
+retSigIntl  = f_ret(sigIntlSym)
+retHoldUS   = f_ret(holdUSSym)
+retHoldIntl = f_ret(holdIntlSym)
+retDef      = f_ret(defSym)
+retBench    = f_ret(benchSym)
+
+// Which series decide, and which series are owned, per mode.
+momUS   = aggressiveMode ? momHoldUS : momSigUS
+momIntl = aggressiveMode ? momHoldIntl : momSigIntl
+retUS   = baselineMode ? retSigUS : retHoldUS
+retIntl = baselineMode ? retSigIntl : retHoldIntl
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 f_short(string s) =>
@@ -101,14 +132,19 @@ f_short(string s) =>
     n = array.size(parts)
     n > 0 ? array.get(parts, n - 1) : s
 
-usName    = f_short(usSym)
-intlName  = f_short(intlSym)
-defName   = f_short(defSym)
-benchName = f_short(benchSym)
-hurdleName = hurdleIsYield ? "3M T-Bill" : f_short(hurdleSym)
+sigUSName    = f_short(sigUSSym)
+sigIntlName  = f_short(sigIntlSym)
+holdUSName   = baselineMode ? sigUSName : f_short(holdUSSym)
+holdIntlName = baselineMode ? sigIntlName : f_short(holdIntlSym)
+defName      = f_short(defSym)
+benchName    = f_short(benchSym)
+hurdleName   = hurdleIsYield ? "3M T-Bill" : f_short(hurdleSym)
+momUSName    = aggressiveMode ? f_short(holdUSSym) : sigUSName
+momIntlName  = aggressiveMode ? f_short(holdIntlSym) : sigIntlName
+modeName     = baselineMode ? "Baseline" : aggressiveMode ? "Aggressive" : "Decoupled"
 
 f_name(int t) =>
-    t == 0 ? usName : t == 1 ? intlName : t == 2 ? defName : "—"
+    t == 0 ? holdUSName : t == 1 ? holdIntlName : t == 2 ? defName : "—"
 
 colUS    = #089981
 colIntl  = #2962FF
@@ -138,7 +174,9 @@ var int   monthsSinceReb = 0
 var int   startTime     = na
 
 isNewMonth = timeframe.change("M")
-ready = not na(momUS) and not na(momIntl) and not na(momDef) and not na(momHurdle)
+// The backtest starts only when every series in use has full lookback history,
+// so the equity curve never silently skips an asset with missing data.
+ready = not na(momSigUS) and not na(momSigIntl) and not na(momHurdle) and not na(momDef) and (baselineMode or (not na(momHoldUS) and not na(momHoldIntl)))
 switchCost = (costPct + slipPct) / 100.0
 
 bool switched = false
@@ -188,10 +226,10 @@ if isNewMonth and ready
 plot(equity, "Strategy equity", color = color.new(colUS, 0), linewidth = 2)
 plot(showBench ? benchEq : na, "Benchmark equity (buy & hold)", color = color.new(colBench, 0), linewidth = 1)
 
-plot(showMomPlots ? momUS * 100 : na,     "US momentum (%)",     color = color.new(colUS, 30))
-plot(showMomPlots ? momIntl * 100 : na,   "Intl momentum (%)",   color = color.new(colIntl, 30))
+plot(showMomPlots ? momUS * 100 : na,     "US momentum (%)",        color = color.new(colUS, 30))
+plot(showMomPlots ? momIntl * 100 : na,   "Intl momentum (%)",      color = color.new(colIntl, 30))
 plot(showMomPlots ? momDef * 100 : na,    "Defensive momentum (%)", color = color.new(colDef, 30))
-plot(showMomPlots ? momHurdle * 100 : na, "Cash hurdle (%)",     color = color.new(colBench, 30), style = plot.style_circles)
+plot(showMomPlots ? momHurdle * 100 : na, "Cash hurdle (%)",        color = color.new(colBench, 30), style = plot.style_circles)
 
 bgcolor(paintBg and target >= 0 ? color.new(f_targetColor(target), 88) : na)
 
@@ -215,7 +253,7 @@ f_money(float x) =>
 
 tPos = tablePosStr == "Top left" ? position.top_left : tablePosStr == "Bottom right" ? position.bottom_right : tablePosStr == "Bottom left" ? position.bottom_left : tablePosStr == "Middle right" ? position.middle_right : position.top_right
 
-var table tbl = table.new(tPos, 3, 17, bgcolor = color.new(color.black, 15), border_width = 1, border_color = color.new(color.gray, 70))
+var table tbl = table.new(tPos, 3, 18, bgcolor = color.new(color.black, 15), border_width = 1, border_color = color.new(color.gray, 70))
 
 if showTable and barstate.islast
     float cagr      = nMonths > 0 ? math.pow(equity / startCap, 12.0 / nMonths) - 1 : na
@@ -239,63 +277,67 @@ if showTable and barstate.islast
     table.cell(tbl, 1, 0, "Strategy", text_color = hdr, text_size = size.small)
     table.cell(tbl, 2, 0, benchName + " B&H", text_color = hdr, text_size = size.small)
 
-    table.cell(tbl, 0, 1, "Current allocation", text_color = dim, text_size = size.small)
-    table.cell(tbl, 1, 1, f_name(target), text_color = target >= 0 ? f_targetColor(target) : dim, text_size = size.small)
-    table.cell(tbl, 2, 1, benchName, text_color = dim, text_size = size.small)
+    table.cell(tbl, 0, 1, "Mode", text_color = dim, text_size = size.small)
+    table.cell(tbl, 1, 1, modeName, text_color = dim, text_size = size.small)
+    table.cell(tbl, 2, 1, "", text_size = size.small)
 
-    table.cell(tbl, 0, 2, usName + " momentum (" + str.tostring(lookback) + "M)", text_color = dim, text_size = size.small)
-    table.cell(tbl, 1, 2, f_pct(momUS), text_color = momUS > momHurdle ? colUS : color.red, text_size = size.small)
-    table.cell(tbl, 2, 2, "", text_size = size.small)
+    table.cell(tbl, 0, 2, "Current allocation", text_color = dim, text_size = size.small)
+    table.cell(tbl, 1, 2, f_name(target), text_color = target >= 0 ? f_targetColor(target) : dim, text_size = size.small)
+    table.cell(tbl, 2, 2, benchName, text_color = dim, text_size = size.small)
 
-    table.cell(tbl, 0, 3, intlName + " momentum", text_color = dim, text_size = size.small)
-    table.cell(tbl, 1, 3, f_pct(momIntl), text_color = momIntl > momHurdle ? colIntl : color.red, text_size = size.small)
+    table.cell(tbl, 0, 3, momUSName + " momentum (" + str.tostring(lookback) + "M)", text_color = dim, text_size = size.small)
+    table.cell(tbl, 1, 3, f_pct(momUS), text_color = momUS > momHurdle ? colUS : color.red, text_size = size.small)
     table.cell(tbl, 2, 3, "", text_size = size.small)
 
-    table.cell(tbl, 0, 4, defName + " momentum", text_color = dim, text_size = size.small)
-    table.cell(tbl, 1, 4, f_pct(momDef), text_color = dim, text_size = size.small)
+    table.cell(tbl, 0, 4, momIntlName + " momentum", text_color = dim, text_size = size.small)
+    table.cell(tbl, 1, 4, f_pct(momIntl), text_color = momIntl > momHurdle ? colIntl : color.red, text_size = size.small)
     table.cell(tbl, 2, 4, "", text_size = size.small)
 
-    table.cell(tbl, 0, 5, "Cash hurdle (" + hurdleName + ")", text_color = dim, text_size = size.small)
-    table.cell(tbl, 1, 5, f_pct(momHurdle), text_color = dim, text_size = size.small)
+    table.cell(tbl, 0, 5, defName + " momentum", text_color = dim, text_size = size.small)
+    table.cell(tbl, 1, 5, f_pct(momDef), text_color = dim, text_size = size.small)
     table.cell(tbl, 2, 5, "", text_size = size.small)
 
-    table.cell(tbl, 0, 6, "CAGR", text_color = dim, text_size = size.small)
-    table.cell(tbl, 1, 6, f_pct(cagr), text_color = hdr, text_size = size.small)
-    table.cell(tbl, 2, 6, f_pct(benchCagr), text_color = dim, text_size = size.small)
+    table.cell(tbl, 0, 6, "Cash hurdle (" + hurdleName + ")", text_color = dim, text_size = size.small)
+    table.cell(tbl, 1, 6, f_pct(momHurdle), text_color = dim, text_size = size.small)
+    table.cell(tbl, 2, 6, "", text_size = size.small)
 
-    table.cell(tbl, 0, 7, "Max drawdown", text_color = dim, text_size = size.small)
-    table.cell(tbl, 1, 7, f_pct(maxDD), text_color = hdr, text_size = size.small)
-    table.cell(tbl, 2, 7, f_pct(benchMaxDD), text_color = dim, text_size = size.small)
+    table.cell(tbl, 0, 7, "CAGR", text_color = dim, text_size = size.small)
+    table.cell(tbl, 1, 7, f_pct(cagr), text_color = hdr, text_size = size.small)
+    table.cell(tbl, 2, 7, f_pct(benchCagr), text_color = dim, text_size = size.small)
 
-    table.cell(tbl, 0, 8, "Sharpe (rf = 0)", text_color = dim, text_size = size.small)
-    table.cell(tbl, 1, 8, f_num(sharpe), text_color = hdr, text_size = size.small)
-    table.cell(tbl, 2, 8, f_num(benchSharpe), text_color = dim, text_size = size.small)
+    table.cell(tbl, 0, 8, "Max drawdown", text_color = dim, text_size = size.small)
+    table.cell(tbl, 1, 8, f_pct(maxDD), text_color = hdr, text_size = size.small)
+    table.cell(tbl, 2, 8, f_pct(benchMaxDD), text_color = dim, text_size = size.small)
 
-    table.cell(tbl, 0, 9, "Ann. volatility", text_color = dim, text_size = size.small)
-    table.cell(tbl, 1, 9, f_pct(vol), text_color = hdr, text_size = size.small)
-    table.cell(tbl, 2, 9, f_pct(benchVol), text_color = dim, text_size = size.small)
+    table.cell(tbl, 0, 9, "Sharpe (rf = 0)", text_color = dim, text_size = size.small)
+    table.cell(tbl, 1, 9, f_num(sharpe), text_color = hdr, text_size = size.small)
+    table.cell(tbl, 2, 9, f_num(benchSharpe), text_color = dim, text_size = size.small)
 
-    table.cell(tbl, 0, 10, "Monthly win rate", text_color = dim, text_size = size.small)
-    table.cell(tbl, 1, 10, f_pct(winRate), text_color = hdr, text_size = size.small)
-    table.cell(tbl, 2, 10, f_pct(benchWinRate), text_color = dim, text_size = size.small)
+    table.cell(tbl, 0, 10, "Ann. volatility", text_color = dim, text_size = size.small)
+    table.cell(tbl, 1, 10, f_pct(vol), text_color = hdr, text_size = size.small)
+    table.cell(tbl, 2, 10, f_pct(benchVol), text_color = dim, text_size = size.small)
 
-    table.cell(tbl, 0, 11, "Allocation switches", text_color = dim, text_size = size.small)
-    table.cell(tbl, 1, 11, str.tostring(switches), text_color = hdr, text_size = size.small)
-    table.cell(tbl, 2, 11, "—", text_color = dim, text_size = size.small)
+    table.cell(tbl, 0, 11, "Monthly win rate", text_color = dim, text_size = size.small)
+    table.cell(tbl, 1, 11, f_pct(winRate), text_color = hdr, text_size = size.small)
+    table.cell(tbl, 2, 11, f_pct(benchWinRate), text_color = dim, text_size = size.small)
 
-    table.cell(tbl, 0, 12, "Months backtested", text_color = dim, text_size = size.small)
-    table.cell(tbl, 1, 12, str.tostring(nMonths), text_color = hdr, text_size = size.small)
-    table.cell(tbl, 2, 12, na(startTime) ? "—" : "since " + str.format_time(startTime, "yyyy-MM"), text_color = dim, text_size = size.small)
+    table.cell(tbl, 0, 12, "Allocation switches", text_color = dim, text_size = size.small)
+    table.cell(tbl, 1, 12, str.tostring(switches), text_color = hdr, text_size = size.small)
+    table.cell(tbl, 2, 12, "—", text_color = dim, text_size = size.small)
 
-    table.cell(tbl, 0, 13, "Portfolio value", text_color = dim, text_size = size.small)
-    table.cell(tbl, 1, 13, f_money(equity), text_color = hdr, text_size = size.small)
-    table.cell(tbl, 2, 13, f_money(benchEq), text_color = dim, text_size = size.small)
+    table.cell(tbl, 0, 13, "Months backtested", text_color = dim, text_size = size.small)
+    table.cell(tbl, 1, 13, str.tostring(nMonths), text_color = hdr, text_size = size.small)
+    table.cell(tbl, 2, 13, na(startTime) ? "—" : "since " + str.format_time(startTime, "yyyy-MM"), text_color = dim, text_size = size.small)
+
+    table.cell(tbl, 0, 14, "Portfolio value", text_color = dim, text_size = size.small)
+    table.cell(tbl, 1, 14, f_money(equity), text_color = hdr, text_size = size.small)
+    table.cell(tbl, 2, 14, f_money(benchEq), text_color = dim, text_size = size.small)
 
     if tfWarn
-        table.cell(tbl, 0, 14, "⚠ Chart timeframe > 1M — use a daily to monthly chart", text_color = color.orange, text_size = size.small)
-        table.cell(tbl, 1, 14, "", text_size = size.small)
-        table.cell(tbl, 2, 14, "", text_size = size.small)
-    if not ready
-        table.cell(tbl, 0, 15, "⚠ Waiting for history: every symbol needs " + str.tostring(lookback + 1) + " completed months", text_color = color.orange, text_size = size.small)
+        table.cell(tbl, 0, 15, "⚠ Chart timeframe > 1M — use a daily to monthly chart", text_color = color.orange, text_size = size.small)
         table.cell(tbl, 1, 15, "", text_size = size.small)
         table.cell(tbl, 2, 15, "", text_size = size.small)
+    if not ready
+        table.cell(tbl, 0, 16, "⚠ Waiting for history: every symbol in use needs " + str.tostring(lookback + 1) + " completed months", text_color = color.orange, text_size = size.small)
+        table.cell(tbl, 1, 16, "", text_size = size.small)
+        table.cell(tbl, 2, 16, "", text_size = size.small)
